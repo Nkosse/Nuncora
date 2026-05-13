@@ -8,6 +8,11 @@ import { discoverCandidates, validateAndFilterTickers } from "@/lib/discovery/cl
 export const runtime = "nodejs"
 export const maxDuration = 300
 
+// Max bedrijven per run — houdt de run binnen 60s op Vercel free tier
+const ANALYSIS_BATCH = 3
+// Pas discovery toe als we nog weinig bedrijven hebben
+const DISCOVERY_THRESHOLD = 10
+
 function authorized(req: NextRequest) {
   return req.headers.get("authorization") === `Bearer ${process.env.CRON_SECRET}`
 }
@@ -22,10 +27,10 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const body = await req.json().catch(() => ({}))
-  return pipeline(body.triggeredBy ?? "manual", body.skipDiscovery ?? false)
+  return pipeline(body.triggeredBy ?? "manual", body.skipDiscovery ?? false, body.batchSize ?? ANALYSIS_BATCH)
 }
 
-async function pipeline(triggeredBy: string, skipDiscovery = false) {
+async function pipeline(triggeredBy: string, skipDiscovery = false, batchSize = ANALYSIS_BATCH) {
   const errors: string[] = []
   const log: string[] = []
   let companiesNew = 0
@@ -42,7 +47,7 @@ async function pipeline(triggeredBy: string, skipDiscovery = false) {
   const runId = runRow?.id
 
   try {
-    // ── Stap 1: Haal bestaande tickers op ──────────────────────
+    // ── Stap 1: Haal bestaande bedrijven op met hun laatste analyse ─
     const { data: existing } = await supabaseAdmin
       .from("companies")
       .select("ticker, id")
@@ -51,10 +56,10 @@ async function pipeline(triggeredBy: string, skipDiscovery = false) {
     const existingTickers = existing?.map((c) => c.ticker) ?? []
     log.push(`Bestaande bedrijven: ${existingTickers.length}`)
 
-    // ── Stap 2: Discovery (nieuwe kansen vinden) ────────────────
-    let allTickers = [...existingTickers]
+    // ── Stap 2: Discovery — alleen als DB weinig bedrijven heeft ────
+    const runDiscovery = !skipDiscovery && existingTickers.length < DISCOVERY_THRESHOLD
 
-    if (!skipDiscovery) {
+    if (runDiscovery) {
       log.push("Discovery gestart — Claude genereert kandidaten...")
 
       const candidates = await discoverCandidates()
@@ -76,17 +81,37 @@ async function pipeline(triggeredBy: string, skipDiscovery = false) {
           discovered_at: new Date().toISOString(),
         }, { onConflict: "id" })
 
-        allTickers.push(v.ticker)
+        existingTickers.push(v.ticker)
         companiesNew++
       }
+    } else if (!skipDiscovery) {
+      log.push(`Discovery overgeslagen — ${existingTickers.length} bedrijven al in DB`)
     }
 
-    // Verwijder duplicaten
-    allTickers = Array.from(new Set(allTickers))
-    log.push(`Totaal te analyseren: ${allTickers.length} bedrijven`)
+    // ── Stap 3: Kies de bedrijven die het langst niet geanalyseerd zijn ─
+    const { data: recentAnalyses } = await supabaseAdmin
+      .from("ai_analyses")
+      .select("company_id, created_at")
+      .order("created_at", { ascending: false })
 
-    // ── Stap 3: Analyseer elk bedrijf ──────────────────────────
-    for (const ticker of allTickers) {
+    // Meest recente analyse per company_id
+    const lastAnalyzed = new Map<string, string>()
+    for (const a of recentAnalyses ?? []) {
+      if (!lastAnalyzed.has(a.company_id)) lastAnalyzed.set(a.company_id, a.created_at)
+    }
+
+    // Sorteer: nooit geanalyseerd eerst, daarna oudste analyse eerst
+    const allTickers = Array.from(new Set(existingTickers)).sort((a, b) => {
+      const aDate = lastAnalyzed.get(a.toLowerCase()) ?? "1970-01-01"
+      const bDate = lastAnalyzed.get(b.toLowerCase()) ?? "1970-01-01"
+      return aDate < bDate ? -1 : aDate > bDate ? 1 : 0
+    })
+
+    const tickersToAnalyze = allTickers.slice(0, batchSize)
+    log.push(`Analyseer ${tickersToAnalyze.length} van ${allTickers.length} bedrijven (batch: ${batchSize})`)
+
+    // ── Stap 4: Analyseer elk bedrijf in de batch ───────────────
+    for (const ticker of tickersToAnalyze) {
       try {
         // FMP profiel — live prijs + market cap
         const profile = await getCompanyProfile(ticker)
@@ -96,7 +121,7 @@ async function pipeline(triggeredBy: string, skipDiscovery = false) {
         }
 
         const companyId = ticker.toLowerCase()
-        const isNew = !existingTickers.includes(ticker)
+        const isNew = !lastAnalyzed.has(ticker.toLowerCase())
 
         // Bedrijfsdata bijwerken in Supabase
         await supabaseAdmin.from("companies").upsert({
@@ -214,7 +239,7 @@ async function pipeline(triggeredBy: string, skipDiscovery = false) {
       }
     }
 
-    // ── Stap 4: Pipeline afsluiten ─────────────────────────────
+    // ── Stap 5: Pipeline afsluiten ─────────────────────────────
     const status = errors.length === 0 ? "success" : analysesRun > 0 ? "partial" : "failed"
 
     await supabaseAdmin.from("pipeline_runs").update({
