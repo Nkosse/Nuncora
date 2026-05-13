@@ -44,8 +44,7 @@ export async function discoverCandidates(): Promise<DiscoveredTicker[]> {
 
   const message = await anthropic.messages.create({
     model: "claude-opus-4-7",
-    max_tokens: 2000,
-    thinking: { type: "adaptive" },
+    max_tokens: 4000,
     messages: [
       {
         role: "user",
@@ -55,11 +54,10 @@ ${DISCOVERY_CRITERIA}
 
 Genereer een lijst van 40-60 bedrijven die aan deze criteria voldoen. Denk breed — neem ook minder bekende namen mee die institutionele beleggers nog niet volledig ontdekt hebben. Dat is precies waar de asymmetrie zit.
 
-Retourneer UITSLUITEND een JSON array (geen markdown, geen uitleg):
+Retourneer UITSLUITEND een JSON array, begin direct met [ en eindig met ]. Geen uitleg, geen markdown, geen code blocks:
 [
   { "ticker": "RKLB", "rationale": "1 zin waarom dit bedrijf past" },
-  { "ticker": "IONQ", "rationale": "..." },
-  ...
+  { "ticker": "IONQ", "rationale": "..." }
 ]`,
       },
     ],
@@ -68,10 +66,14 @@ Retourneer UITSLUITEND een JSON array (geen markdown, geen uitleg):
   const textBlock = message.content.find((b) => b.type === "text")
   if (!textBlock || textBlock.type !== "text") return []
 
-  const raw = textBlock.text.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim()
+  const text = textBlock.text
+  // Haal de JSON array op — zoek naar het eerste [ en laatste ]
+  const start = text.indexOf("[")
+  const end   = text.lastIndexOf("]")
+  if (start === -1 || end === -1 || end <= start) return []
 
   try {
-    return JSON.parse(raw) as DiscoveredTicker[]
+    return JSON.parse(text.slice(start, end + 1)) as DiscoveredTicker[]
   } catch {
     return []
   }
