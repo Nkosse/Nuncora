@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, AlertTriangle, Calendar, Newspaper, Brain } from "lucide-react"
+import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, AlertTriangle, Calendar, Newspaper, Brain, BarChart2 } from "lucide-react"
 import { supabaseAdmin } from "@/lib/supabase/admin"
 import { Disclaimer } from "@/components/shared/disclaimer"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
+import { FinancialTab } from "./financial-tab"
 
 export const revalidate = 3600
 
@@ -143,7 +144,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "Market Cap",       value: company.market_cap ? fmtMCap(company.market_cap) : "—",             sub: "Live van FMP" },
-          { label: "Asymm. Score",     value: company.score_total != null ? `${company.score_total}/100` : "—",   sub: "Claude AI analyse" },
+          { label: "Conviction Score",   value: company.score_total != null ? `${company.score_total}/100` : "—",   sub: "10 factoren · 0–100" },
           { label: "Prijsdoel (base)", value: analysis?.price_target_base ? `$${analysis.price_target_base}` : "—", sub: "12-maands prognose" },
           { label: "Prijsdoel (bull)", value: analysis?.price_target_bull ? `$${analysis.price_target_bull}` : "—", sub: "Bull scenario" },
         ].map((k) => (
@@ -159,6 +160,9 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
       <Tabs defaultValue="overview">
         <TabsList className="w-full md:w-auto">
           <TabsTrigger value="overview">Overzicht</TabsTrigger>
+          <TabsTrigger value="financials" className="gap-1.5">
+            <BarChart2 className="h-3.5 w-3.5" /> Financieel
+          </TabsTrigger>
           <TabsTrigger value="score">Score</TabsTrigger>
           <TabsTrigger value="catalysts">Catalysts ({catalysts.length})</TabsTrigger>
           <TabsTrigger value="news">Nieuws ({news.length})</TabsTrigger>
@@ -267,12 +271,22 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                 {/* Analyse meta */}
                 <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3">
                   <p className="text-xs text-zinc-600">
-                    Geanalyseerd op {new Date(analysis.generated_at).toLocaleDateString("nl-NL")} · {analysis.model} · {analysis.news_used} nieuwsartikelen meegenomen
+                    Bijgewerkt op {new Date(analysis.generated_at).toLocaleDateString("nl-NL")} · {analysis.news_used} nieuwsartikelen meegenomen
                   </p>
                 </div>
               </div>
             </div>
           )}
+        </TabsContent>
+
+        {/* Financieel */}
+        <TabsContent value="financials" className="mt-5">
+          <FinancialTab
+            ticker={company.ticker}
+            price={company.price}
+            marketCap={company.market_cap}
+            beta={company.beta}
+          />
         </TabsContent>
 
         {/* Score breakdown */}

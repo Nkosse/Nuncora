@@ -3,7 +3,7 @@ import Link from "next/link"
 import { Brain, TrendingUp, AlertTriangle, Calendar, ArrowRight, Newspaper } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-export const metadata = { title: "AI Onderzoek" }
+export const metadata = { title: "Research" }
 export const revalidate = 3600
 
 function scoreColor(s: number) {
@@ -44,7 +44,7 @@ export default async function AIResearchPage() {
             <Brain className="h-4 w-4 text-indigo-400" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-zinc-100">AI Research Pipeline</p>
+            <p className="text-sm font-semibold text-zinc-100">Research Pipeline</p>
             <p className="text-xs text-zinc-500">Nachtelijke analyse — elke dag 02:00 Amsterdam</p>
           </div>
           {lastRun && (

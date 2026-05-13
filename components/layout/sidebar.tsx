@@ -17,12 +17,12 @@ import {
 } from "lucide-react"
 
 const navItems = [
-  { href: "/dashboard",    label: "Dashboard",    icon: LayoutDashboard },
-  { href: "/companies",    label: "Companies",    icon: Building2 },
-  { href: "/watchlists",   label: "Watchlists",   icon: BookMarked },
-  { href: "/catalysts",    label: "Catalysts",    icon: Calendar },
-  { href: "/screener",     label: "Screener",     icon: Filter },
-  { href: "/ai-research",  label: "AI Research",  icon: Brain, badge: "AI" },
+  { href: "/dashboard",   label: "Dashboard",  icon: LayoutDashboard },
+  { href: "/companies",   label: "Companies",  icon: Building2 },
+  { href: "/watchlists",  label: "Watchlists", icon: BookMarked },
+  { href: "/catalysts",   label: "Catalysts",  icon: Calendar },
+  { href: "/screener",    label: "Screener",   icon: Filter },
+  { href: "/ai-research", label: "Research",   icon: Brain },
 ]
 
 export function Sidebar() {
@@ -59,11 +59,6 @@ export function Sidebar() {
                 isActive ? "text-indigo-400" : "text-zinc-600 group-hover:text-zinc-400"
               )} />
               <span className="flex-1">{item.label}</span>
-              {item.badge && (
-                <span className="text-[10px] font-bold text-indigo-400 bg-indigo-500/10 rounded px-1">
-                  {item.badge}
-                </span>
-              )}
               {isActive && <ChevronRight className="h-3 w-3 text-indigo-500/60" />}
             </Link>
           )
@@ -72,10 +67,10 @@ export function Sidebar() {
         {/* Status card */}
         <div className="mt-4 mx-1 rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
           <div className="flex items-center gap-2">
-            <div className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-            <span className="text-xs text-zinc-500">Markets closed</span>
+            <div className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            <span className="text-xs text-zinc-500">Live data</span>
           </div>
-          <p className="text-xs text-zinc-700 mt-1">Mock data · 12 May 2026</p>
+          <p className="text-xs text-zinc-700 mt-1">Nachtelijks bijgewerkt</p>
         </div>
       </nav>
 
@@ -100,8 +95,8 @@ export function Sidebar() {
             <span className="text-xs font-bold text-indigo-400">NK</span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-zinc-300 truncate">Demo User</p>
-            <p className="text-xs text-zinc-600 truncate">Pro Plan · Active</p>
+            <p className="text-xs font-medium text-zinc-300 truncate">Niek</p>
+            <p className="text-xs text-zinc-600 truncate">nuncora.vercel.app</p>
           </div>
           <Zap className="h-3.5 w-3.5 text-amber-400 shrink-0" />
         </div>

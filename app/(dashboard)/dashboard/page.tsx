@@ -115,7 +115,7 @@ export default async function DashboardPage() {
           {[
             { label: "Bedrijven gevolgd",    value: companies.length.toString(),       sub: "Actief gevolgd",             icon: Building2,     color: "text-indigo-400" },
             { label: "Gem. Upside Score",    value: `${avgScore}/100`,                 sub: "Over alle bedrijven",        icon: TrendingUp,    color: "text-emerald-400" },
-            { label: "Komende catalysts",    value: catalysts.length.toString(),       sub: "Geïdentificeerd door AI",    icon: Calendar,      color: "text-amber-400" },
+            { label: "Komende catalysts",    value: catalysts.length.toString(),       sub: "Geïdentificeerd",            icon: Calendar,      color: "text-amber-400" },
             { label: "Hoog risico",          value: highRisk.length.toString(),        sub: "Vereisen aandacht",          icon: AlertTriangle, color: "text-red-400" },
           ].map((stat) => {
             const Icon = stat.icon
@@ -269,7 +269,7 @@ export default async function DashboardPage() {
       {/* Quick links */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { href: "/ai-research", icon: Zap,        label: "AI Onderzoek",    desc: "Diepgaande analyse per bedrijf",       color: "text-violet-400" },
+          { href: "/ai-research", icon: Zap,        label: "Research",        desc: "Pipeline status & analyses",           color: "text-violet-400" },
           { href: "/watchlists",  icon: Star,        label: "Watchlists",      desc: "Thematische investeringslijsten",       color: "text-amber-400" },
           { href: "/screener",    icon: TrendingUp,  label: "Screener",        desc: "Filter op score, sector en risico",     color: "text-emerald-400" },
         ].map((item) => {

@@ -3,11 +3,11 @@ import "./globals.css"
 
 export const metadata: Metadata = {
   title: {
-    default: "Convex — AI-Powered Investment Intelligence",
-    template: "%s | Convex",
+    default: "Nuncora — Investment Intelligence",
+    template: "%s | Nuncora",
   },
-  description: "AI-powered intelligence platform for asymmetric investment opportunities in future-tech smallcaps.",
-  keywords: ["investment", "smallcap", "AI analysis", "stocks", "portfolio", "future-tech"],
+  description: "Investment intelligence platform voor asymmetrische kansen in future-tech smallcaps.",
+  keywords: ["investment", "smallcap", "stocks", "portfolio", "future-tech", "research"],
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
