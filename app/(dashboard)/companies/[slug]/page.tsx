@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { FinancialTab } from "./financial-tab"
 
-export const revalidate = 3600
+export const revalidate = 1800
 
 function scoreColor(s: number) {
   if (s >= 80) return "text-emerald-400"
