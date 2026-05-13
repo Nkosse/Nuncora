@@ -1,42 +1,12 @@
 import Link from "next/link"
-import {
-  TrendingUp, TrendingDown, AlertTriangle, Calendar,
-  ArrowRight, Zap, Building2, Star
-} from "lucide-react"
-import { companies, asymmetricScores, getScoreByCompanyId, getKPIsByCompanyId } from "@/data/mock/companies"
-import { catalysts } from "@/data/mock/catalysts"
+import { TrendingUp, TrendingDown, AlertTriangle, Calendar, ArrowRight, Zap, Building2, Star, RefreshCw } from "lucide-react"
+import { supabaseAdmin } from "@/lib/supabase/admin"
 import { SectorBadge } from "@/components/shared/sector-badge"
 import { Disclaimer } from "@/components/shared/disclaimer"
 import { Button } from "@/components/ui/button"
-import { SyncPanel } from "@/components/sync/sync-panel"
 
 export const metadata = { title: "Dashboard" }
-
-// Top opportunities: sorted by score
-const topOpportunities = companies
-  .map((c) => ({ company: c, score: getScoreByCompanyId(c.id)! }))
-  .filter((x) => x.score)
-  .sort((a, b) => b.score.totalScore - a.score.totalScore)
-  .slice(0, 6)
-
-// Upcoming catalysts (next 60 days)
-const upcomingCatalysts = catalysts
-  .filter((c) => c.isUpcoming && c.date)
-  .sort((a, b) => new Date(a.date!).getTime() - new Date(b.date!).getTime())
-  .slice(0, 5)
-
-// Risk alerts: high dilution risk or high short interest
-const riskAlerts = companies
-  .map((c) => ({ company: c, kpis: getKPIsByCompanyId(c.id)! }))
-  .filter((x) => x.kpis && (x.kpis.dilutionRisk === "High" || x.kpis.shortInterest > 12))
-  .slice(0, 3)
-
-const sectorStats = [
-  { sector: "Space Economy",     count: 2, avgScore: 77, emoji: "🚀" },
-  { sector: "Quantum Computing", count: 2, avgScore: 69, emoji: "⚛️" },
-  { sector: "AI Infrastructure", count: 2, avgScore: 73, emoji: "🤖" },
-  { sector: "Defense Tech",      count: 2, avgScore: 72, emoji: "🛡️" },
-]
+export const revalidate = 3600 // ververs elke 60 minuten
 
 function scoreColor(s: number) {
   if (s >= 80) return "text-emerald-400"
@@ -51,212 +21,257 @@ function impactColor(level: string) {
   return "text-amber-400 bg-amber-500/10 border-amber-500/20"
 }
 
-export default function DashboardPage() {
-  const avgScore = Math.round(asymmetricScores.reduce((s, x) => s + x.totalScore, 0) / asymmetricScores.length)
+function riskColor(level: string) {
+  if (level === "very-high") return "text-red-400"
+  if (level === "high")      return "text-orange-400"
+  if (level === "medium")    return "text-amber-400"
+  return "text-emerald-400"
+}
+
+export default async function DashboardPage() {
+  // Data ophalen uit Supabase
+  const [companiesRes, catalystsRes, runRes] = await Promise.allSettled([
+    supabaseAdmin
+      .from("companies_with_latest_analysis")
+      .select("*")
+      .not("score_total", "is", null)
+      .order("score_total", { ascending: false }),
+    supabaseAdmin
+      .from("upcoming_catalysts")
+      .select("*")
+      .limit(6),
+    supabaseAdmin
+      .from("pipeline_runs")
+      .select("finished_at, status, companies_updated, analyses_run")
+      .eq("status", "success")
+      .order("finished_at", { ascending: false })
+      .limit(1)
+      .single(),
+  ])
+
+  const companies = companiesRes.status === "fulfilled" ? (companiesRes.value.data ?? []) : []
+  const catalysts = catalystsRes.status === "fulfilled" ? (catalystsRes.value.data ?? []) : []
+  const lastRun   = runRes.status === "fulfilled" ? runRes.value.data : null
+
+  const topOpportunities = companies.slice(0, 6)
+  const avgScore = companies.length > 0
+    ? Math.round(companies.reduce((s, c) => s + (c.score_total ?? 0), 0) / companies.length)
+    : 0
+  const highRisk = companies.filter((c) => c.risk_level === "high" || c.risk_level === "very-high").slice(0, 3)
+
+  // Sector-overzicht berekenen
+  const sectorMap: Record<string, { count: number; totalScore: number; emoji: string }> = {}
+  const sectorEmoji: Record<string, string> = {
+    "Industrials": "🚀", "Technology": "💻", "Healthcare": "🧬",
+    "Energy": "⚡", "Communication Services": "📡", "Consumer Discretionary": "🤖",
+    "Financials": "💰", "Materials": "⚗️", "Utilities": "🔋",
+  }
+  for (const c of companies) {
+    const s = c.sector ?? "Other"
+    if (!sectorMap[s]) sectorMap[s] = { count: 0, totalScore: 0, emoji: sectorEmoji[s] ?? "📊" }
+    sectorMap[s].count++
+    sectorMap[s].totalScore += c.score_total ?? 0
+  }
+  const sectorStats = Object.entries(sectorMap)
+    .map(([sector, d]) => ({ sector, count: d.count, avgScore: Math.round(d.totalScore / d.count), emoji: d.emoji }))
+    .sort((a, b) => b.avgScore - a.avgScore)
+    .slice(0, 4)
+
+  const isEmpty = companies.length === 0
+  const today = new Date().toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" })
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-zinc-100">Good morning, Demo User</h2>
-          <p className="text-sm text-zinc-500 mt-0.5">Here&apos;s your investment intelligence for 12 May 2026</p>
+          <h2 className="text-2xl font-bold text-zinc-100">Investment Intelligence</h2>
+          <p className="text-sm text-zinc-500 mt-0.5">
+            {lastRun
+              ? `Bijgewerkt op ${new Date(lastRun.finished_at).toLocaleDateString("nl-NL", { day: "numeric", month: "long" })} · ${lastRun.analyses_run} bedrijven geanalyseerd`
+              : `${today} · Wacht op eerste pipeline-run`}
+          </p>
         </div>
         <Link href="/companies">
           <Button variant="outline" size="sm" className="gap-1.5">
             <Building2 className="h-3.5 w-3.5" />
-            Browse companies
+            Alle bedrijven
           </Button>
         </Link>
       </div>
 
+      {/* Pipeline nog niet gedraaid */}
+      {isEmpty && (
+        <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-6 text-center">
+          <RefreshCw className="h-8 w-8 text-indigo-400 mx-auto mb-3 animate-spin" />
+          <p className="text-sm font-semibold text-indigo-300">Pipeline is aan het draaien</p>
+          <p className="text-xs text-zinc-500 mt-1">Claude is bezig met het ontdekken en analyseren van bedrijven. Dit duurt 15–25 minuten.</p>
+        </div>
+      )}
+
       {/* KPI row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: "Companies Tracked", value: companies.length.toString(), sub: "15 sectors covered", icon: Building2, color: "text-indigo-400" },
-          { label: "Avg. Upside Score",  value: `${avgScore}/100`,           sub: "Across all companies", icon: TrendingUp, color: "text-emerald-400" },
-          { label: "Upcoming Catalysts", value: upcomingCatalysts.length.toString(), sub: "Next 60 days",   icon: Calendar, color: "text-amber-400" },
-          { label: "Risk Alerts",        value: riskAlerts.length.toString(), sub: "Require attention",   icon: AlertTriangle, color: "text-red-400" },
-        ].map((stat) => {
-          const Icon = stat.icon
-          return (
-            <div key={stat.label} className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">{stat.label}</span>
-                <Icon className={`h-4 w-4 ${stat.color}`} />
+      {!isEmpty && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: "Bedrijven gevolgd",    value: companies.length.toString(),       sub: "Actief gevolgd",             icon: Building2,     color: "text-indigo-400" },
+            { label: "Gem. Upside Score",    value: `${avgScore}/100`,                 sub: "Over alle bedrijven",        icon: TrendingUp,    color: "text-emerald-400" },
+            { label: "Komende catalysts",    value: catalysts.length.toString(),       sub: "Geïdentificeerd door AI",    icon: Calendar,      color: "text-amber-400" },
+            { label: "Hoog risico",          value: highRisk.length.toString(),        sub: "Vereisen aandacht",          icon: AlertTriangle, color: "text-red-400" },
+          ].map((stat) => {
+            const Icon = stat.icon
+            return (
+              <div key={stat.label} className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">{stat.label}</span>
+                  <Icon className={`h-4 w-4 ${stat.color}`} />
+                </div>
+                <p className={`text-2xl font-bold tabular-nums ${stat.color}`}>{stat.value}</p>
+                <p className="text-xs text-zinc-600 mt-1">{stat.sub}</p>
               </div>
-              <p className={`text-2xl font-bold tabular-nums ${stat.color}`}>{stat.value}</p>
-              <p className="text-xs text-zinc-600 mt-1">{stat.sub}</p>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* AI Sync Panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1">
-          <SyncPanel />
+            )
+          })}
         </div>
-        <div className="lg:col-span-2 rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 flex flex-col justify-center gap-3">
-          <div className="flex items-center gap-2">
-            <Zap className="h-4 w-4 text-indigo-400" />
-            <h3 className="text-sm font-semibold text-zinc-100">How AI Sync works</h3>
-          </div>
-          <ol className="space-y-2">
-            {[
-              { n: "1", text: "FMP screener finds $50M–$3B smallcap companies in future-tech sectors" },
-              { n: "2", text: "Financial data is pulled: income statement, balance sheet, cash flow, key metrics" },
-              { n: "3", text: "Claude (claude-opus-4-7) analyzes each company and generates an Asymmetric Upside Score™" },
-              { n: "4", text: "Results are ranked by score — highest conviction opportunities surface to the top" },
-            ].map((step) => (
-              <li key={step.n} className="flex items-start gap-3">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[10px] font-bold text-indigo-400">
-                  {step.n}
-                </span>
-                <p className="text-xs text-zinc-500 leading-relaxed pt-0.5">{step.text}</p>
-              </li>
-            ))}
-          </ol>
-          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2">
-            <p className="text-[11px] text-amber-400">
-              Requires <code className="font-mono">ANTHROPIC_API_KEY</code> and <code className="font-mono">FMP_API_KEY</code> in <code className="font-mono">.env.local</code>
-            </p>
-          </div>
-        </div>
-      </div>
+      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Top Opportunities */}
-        <div className="lg:col-span-2 rounded-xl border border-zinc-800 bg-zinc-900">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
-            <div className="flex items-center gap-2">
-              <Star className="h-4 w-4 text-amber-400" />
-              <h3 className="font-semibold text-zinc-100">Top Asymmetric Opportunities</h3>
-            </div>
-            <Link href="/companies" className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
-              View all <ArrowRight className="h-3 w-3" />
-            </Link>
-          </div>
-          <div className="divide-y divide-zinc-800/50">
-            {topOpportunities.map(({ company, score }) => (
-              <Link
-                key={company.id}
-                href={`/companies/${company.slug}`}
-                className="flex items-center gap-4 px-5 py-3.5 hover:bg-zinc-800/40 transition-colors group"
-              >
-                <div className={`h-9 w-9 rounded-lg ${company.logoPlaceholder} flex items-center justify-center shrink-0`}>
-                  <span className="text-xs font-bold text-white">{company.ticker.slice(0, 2)}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-zinc-200 group-hover:text-white truncate">{company.name}</span>
-                    <span className="text-xs text-zinc-600 font-mono shrink-0">{company.ticker}</span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <SectorBadge sector={company.sector} />
-                  </div>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className={`text-lg font-bold tabular-nums ${scoreColor(score.totalScore)}`}>{score.totalScore}</p>
-                  <p className="text-xs text-zinc-600">/ 100</p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className={`text-sm font-semibold tabular-nums ${company.stockPriceChange >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                    ${company.stockPrice.toFixed(2)}
-                  </p>
-                  <p className={`text-xs ${company.stockPriceChange >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-                    {company.stockPriceChange >= 0 ? "+" : ""}{company.stockPriceChange.toFixed(1)}%
-                  </p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {/* Right column */}
-        <div className="space-y-5">
-          {/* Upcoming catalysts */}
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900">
+      {!isEmpty && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Top kansen */}
+          <div className="lg:col-span-2 rounded-xl border border-zinc-800 bg-zinc-900">
             <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
               <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-indigo-400" />
-                <h3 className="font-semibold text-zinc-100">Upcoming Catalysts</h3>
+                <Star className="h-4 w-4 text-amber-400" />
+                <h3 className="font-semibold text-zinc-100">Top Asymmetrische Kansen</h3>
               </div>
-              <Link href="/catalysts" className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
-                All <ArrowRight className="h-3 w-3" />
+              <Link href="/companies" className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+                Alle <ArrowRight className="h-3 w-3" />
               </Link>
             </div>
             <div className="divide-y divide-zinc-800/50">
-              {upcomingCatalysts.map((cat) => (
-                <div key={cat.id} className="px-5 py-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-zinc-200 truncate">{cat.companyTicker} · {cat.title}</p>
-                      <p className="text-xs text-zinc-600 mt-0.5">{cat.date ?? cat.estimatedPeriod}</p>
-                    </div>
-                    <span className={`shrink-0 text-xs rounded-md px-1.5 py-0.5 border font-medium ${impactColor(cat.impactLevel)}`}>
-                      {cat.impactLevel}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Risk alerts */}
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900">
-            <div className="flex items-center gap-2 px-5 py-4 border-b border-zinc-800">
-              <AlertTriangle className="h-4 w-4 text-red-400" />
-              <h3 className="font-semibold text-zinc-100">Risk Alerts</h3>
-            </div>
-            <div className="divide-y divide-zinc-800/50">
-              {riskAlerts.map(({ company, kpis }) => (
-                <Link key={company.id} href={`/companies/${company.slug}`} className="flex items-center gap-3 px-5 py-3 hover:bg-zinc-800/40 transition-colors">
-                  <div className={`h-7 w-7 rounded ${company.logoPlaceholder} flex items-center justify-center shrink-0`}>
-                    <span className="text-xs font-bold text-white">{company.ticker.slice(0, 2)}</span>
+              {topOpportunities.map((company) => (
+                <Link
+                  key={company.id}
+                  href={`/companies/${company.slug}`}
+                  className="flex items-center gap-4 px-5 py-3.5 hover:bg-zinc-800/40 transition-colors group"
+                >
+                  <div className="h-9 w-9 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
+                    <span className="text-xs font-bold text-indigo-400">{company.ticker.slice(0, 2)}</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-zinc-300 truncate">{company.name}</p>
-                    <p className="text-xs text-red-400 mt-0.5">
-                      {kpis.dilutionRisk === "High" ? "High dilution risk" : `Short interest ${kpis.shortInterest}%`}
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-zinc-200 group-hover:text-white truncate">{company.name}</span>
+                      <span className="text-xs text-zinc-600 font-mono shrink-0">{company.ticker}</span>
+                    </div>
+                    <p className="text-xs text-zinc-600 mt-0.5 truncate">{company.sector}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className={`text-lg font-bold tabular-nums ${scoreColor(company.score_total ?? 0)}`}>{company.score_total}</p>
+                    <p className="text-xs text-zinc-600">/ 100</p>
+                  </div>
+                  <div className="text-right shrink-0 w-16">
+                    <p className="text-sm font-semibold tabular-nums text-zinc-200">${company.price?.toFixed(2) ?? "—"}</p>
+                    <p className={`text-xs ${(company.price_change_pct ?? 0) >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+                      {(company.price_change_pct ?? 0) >= 0 ? "+" : ""}{(company.price_change_pct ?? 0).toFixed(1)}%
                     </p>
                   </div>
-                  <TrendingDown className="h-4 w-4 text-red-500 shrink-0" />
                 </Link>
               ))}
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Sector cards */}
-      <div>
-        <h3 className="text-sm font-semibold text-zinc-500 uppercase tracking-wider mb-3">Sector Overview</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {sectorStats.map((s) => (
-            <Link key={s.sector} href={`/companies?sector=${encodeURIComponent(s.sector)}`}>
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 hover:border-zinc-700 transition-colors">
-                <div className="text-2xl mb-2">{s.emoji}</div>
-                <p className="text-sm font-semibold text-zinc-200">{s.sector}</p>
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-xs text-zinc-600">{s.count} companies</span>
-                  <span className={`text-xs font-bold ${scoreColor(s.avgScore)}`}>Avg {s.avgScore}</span>
+          {/* Rechterkolom */}
+          <div className="space-y-5">
+            {/* Catalysts */}
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-indigo-400" />
+                  <h3 className="font-semibold text-zinc-100">Komende Catalysts</h3>
                 </div>
-                <div className="mt-2 h-1 rounded-full bg-zinc-800">
-                  <div className="h-full rounded-full bg-indigo-500" style={{ width: `${s.avgScore}%` }} />
-                </div>
+                <Link href="/catalysts" className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+                  Alle <ArrowRight className="h-3 w-3" />
+                </Link>
               </div>
-            </Link>
-          ))}
+              <div className="divide-y divide-zinc-800/50">
+                {catalysts.length === 0 && (
+                  <p className="text-xs text-zinc-600 px-5 py-4">Nog geen catalysts — pipeline loopt nog.</p>
+                )}
+                {catalysts.map((cat) => (
+                  <div key={cat.id} className="px-5 py-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-zinc-200 truncate">{cat.company_ticker} · {cat.title}</p>
+                        <p className="text-xs text-zinc-600 mt-0.5">{cat.estimated_period ?? cat.catalyst_date}</p>
+                      </div>
+                      <span className={`shrink-0 text-xs rounded-md px-1.5 py-0.5 border font-medium ${impactColor(cat.impact_level)}`}>
+                        {cat.impact_level}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Risk alerts */}
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900">
+              <div className="flex items-center gap-2 px-5 py-4 border-b border-zinc-800">
+                <AlertTriangle className="h-4 w-4 text-red-400" />
+                <h3 className="font-semibold text-zinc-100">Risico Alerts</h3>
+              </div>
+              <div className="divide-y divide-zinc-800/50">
+                {highRisk.length === 0 && (
+                  <p className="text-xs text-zinc-600 px-5 py-4">Geen hoog-risico bedrijven gevonden.</p>
+                )}
+                {highRisk.map((company) => (
+                  <Link key={company.id} href={`/companies/${company.slug}`}
+                    className="flex items-center gap-3 px-5 py-3 hover:bg-zinc-800/40 transition-colors">
+                    <div className="h-7 w-7 rounded bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
+                      <span className="text-xs font-bold text-red-400">{company.ticker.slice(0, 2)}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-zinc-300 truncate">{company.name}</p>
+                      <p className={`text-xs mt-0.5 ${riskColor(company.risk_level)}`}>
+                        Risico: {company.risk_level}
+                      </p>
+                    </div>
+                    <TrendingDown className="h-4 w-4 text-red-500 shrink-0" />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Sector overzicht */}
+      {sectorStats.length > 0 && (
+        <div>
+          <h3 className="text-sm font-semibold text-zinc-500 uppercase tracking-wider mb-3">Sector Overzicht</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {sectorStats.map((s) => (
+              <Link key={s.sector} href={`/companies?sector=${encodeURIComponent(s.sector)}`}>
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 hover:border-zinc-700 transition-colors">
+                  <div className="text-2xl mb-2">{s.emoji}</div>
+                  <p className="text-sm font-semibold text-zinc-200">{s.sector}</p>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-xs text-zinc-600">{s.count} bedrijven</span>
+                    <span className={`text-xs font-bold ${scoreColor(s.avgScore)}`}>Gem. {s.avgScore}</span>
+                  </div>
+                  <div className="mt-2 h-1 rounded-full bg-zinc-800">
+                    <div className="h-full rounded-full bg-indigo-500" style={{ width: `${s.avgScore}%` }} />
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Quick links */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { href: "/ai-research", icon: Zap, label: "Generate AI Thesis", desc: "AI-powered analysis for any company", color: "text-violet-400" },
-          { href: "/watchlists",  icon: Star, label: "View Watchlists",    desc: "8 curated thematic portfolios",       color: "text-amber-400" },
-          { href: "/screener",    icon: TrendingUp, label: "Open Screener", desc: "Filter 15 companies by 20+ metrics",  color: "text-emerald-400" },
+          { href: "/ai-research", icon: Zap,        label: "AI Onderzoek",    desc: "Diepgaande analyse per bedrijf",       color: "text-violet-400" },
+          { href: "/watchlists",  icon: Star,        label: "Watchlists",      desc: "Thematische investeringslijsten",       color: "text-amber-400" },
+          { href: "/screener",    icon: TrendingUp,  label: "Screener",        desc: "Filter op score, sector en risico",     color: "text-emerald-400" },
         ].map((item) => {
           const Icon = item.icon
           return (
