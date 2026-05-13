@@ -1,201 +1,192 @@
-"use client"
-
-import { useState } from "react"
-import { Brain, Sparkles, ChevronDown, AlertTriangle, Zap } from "lucide-react"
-import { companies } from "@/data/mock/companies"
-import { aiSummaries } from "@/data/mock/ai-summaries"
-import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { Disclaimer } from "@/components/shared/disclaimer"
-import { SectorBadge } from "@/components/shared/sector-badge"
+import { supabaseAdmin } from "@/lib/supabase/admin"
+import Link from "next/link"
+import { Brain, TrendingUp, AlertTriangle, Calendar, ArrowRight, Newspaper } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-// TODO: Replace mock response with real OpenAI API call
-// See /lib/openai/client.ts for the prepared client
+export const metadata = { title: "AI Onderzoek" }
+export const revalidate = 3600
 
-export default function AIResearchPage() {
-  const [selectedCompanyId, setSelectedCompanyId] = useState("")
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [showResult, setShowResult] = useState(false)
+function scoreColor(s: number) {
+  if (s >= 80) return "text-emerald-400"
+  if (s >= 65) return "text-blue-400"
+  if (s >= 50) return "text-amber-400"
+  return "text-red-400"
+}
 
-  const selectedCompany = companies.find((c) => c.id === selectedCompanyId)
-  const aiSummary = aiSummaries.find((s) => s.companyId === selectedCompanyId)
+export default async function AIResearchPage() {
+  const { data: companies } = await supabaseAdmin
+    .from("companies_with_latest_analysis")
+    .select("*")
+    .not("score_total", "is", null)
+    .order("score_total", { ascending: false })
 
-  function handleGenerate() {
-    if (!selectedCompanyId) return
-    setIsGenerating(true)
-    setShowResult(false)
-    // Simulate AI generation delay
-    setTimeout(() => {
-      setIsGenerating(false)
-      setShowResult(true)
-    }, 2200)
-  }
+  const { data: recentNews } = await supabaseAdmin
+    .from("recent_news")
+    .select("*")
+    .limit(10)
+
+  const { data: lastRun } = await supabaseAdmin
+    .from("pipeline_runs")
+    .select("*")
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .single()
+
+  const all = companies ?? []
+  const news = recentNews ?? []
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-5">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="h-10 w-10 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center">
-            <Brain className="h-5 w-5 text-indigo-400" />
+    <div className="max-w-6xl mx-auto space-y-6">
+      {/* Pipeline status */}
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="h-8 w-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+            <Brain className="h-4 w-4 text-indigo-400" />
           </div>
           <div>
-            <h2 className="font-bold text-zinc-100">AI Investment Thesis Generator</h2>
-            <p className="text-xs text-zinc-500">Powered by GPT-4o · Structured analysis in seconds</p>
+            <p className="text-sm font-semibold text-zinc-100">AI Research Pipeline</p>
+            <p className="text-xs text-zinc-500">Nachtelijke analyse — elke dag 02:00 Amsterdam</p>
           </div>
-          <Badge className="ml-auto" variant="secondary">Mock Mode</Badge>
-        </div>
-        <p className="text-sm text-zinc-500">
-          Select a company to generate a structured investment thesis including bull/bear cases,
-          key catalysts, main risks, thesis breakers, and valuation scenarios.
-        </p>
-        <p className="text-xs text-amber-400/70 mt-2 flex items-center gap-1">
-          <AlertTriangle className="h-3 w-3" />
-          Using mock AI responses. Connect your OpenAI API key in <code className="text-xs font-mono bg-zinc-800 px-1 rounded">.env.local</code> to enable live generation.
-        </p>
-      </div>
-
-      {/* Generator */}
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-        <h3 className="font-semibold text-zinc-100 mb-4">Generate Analysis</h3>
-        <div className="flex gap-3">
-          <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
-            <SelectTrigger className="flex-1">
-              <SelectValue placeholder="Select a company…" />
-            </SelectTrigger>
-            <SelectContent>
-              {companies.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  <span className="font-mono text-zinc-400 mr-2">{c.ticker}</span>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button onClick={handleGenerate} disabled={!selectedCompanyId || isGenerating} className="gap-2 shrink-0">
-            {isGenerating ? (
-              <>
-                <span className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Generating…
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4" />
-                Generate
-              </>
-            )}
-          </Button>
+          {lastRun && (
+            <div className="ml-auto text-right">
+              <div className={cn("text-xs font-medium rounded px-2 py-0.5", lastRun.status === "success" ? "text-emerald-400 bg-emerald-500/10" : lastRun.status === "running" ? "text-blue-400 bg-blue-500/10" : "text-amber-400 bg-amber-500/10")}>
+                {lastRun.status}
+              </div>
+              <p className="text-xs text-zinc-600 mt-1">
+                {new Date(lastRun.started_at).toLocaleDateString("nl-NL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+              </p>
+            </div>
+          )}
         </div>
 
-        {selectedCompany && (
-          <div className="mt-3 flex items-center gap-2 text-xs text-zinc-500">
-            <SectorBadge sector={selectedCompany.sector} />
-            <span>{selectedCompany.exchange} · {selectedCompany.marketCapCategory} Cap · ${selectedCompany.stockPrice.toFixed(2)}</span>
+        {lastRun && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { label: "Gevonden",    value: lastRun.companies_found ?? 0,   color: "text-zinc-300" },
+              { label: "Bijgewerkt",  value: lastRun.companies_updated ?? 0, color: "text-blue-400" },
+              { label: "Nieuw",       value: lastRun.companies_new ?? 0,     color: "text-emerald-400" },
+              { label: "Analyses",    value: lastRun.analyses_run ?? 0,      color: "text-indigo-400" },
+            ].map((s) => (
+              <div key={s.label} className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-3 text-center">
+                <p className={cn("text-xl font-bold tabular-nums", s.color)}>{s.value}</p>
+                <p className="text-xs text-zinc-600 mt-0.5">{s.label}</p>
+              </div>
+            ))}
           </div>
+        )}
+
+        {!lastRun && (
+          <p className="text-sm text-zinc-500 text-center py-4">Pipeline heeft nog niet gedraaid.</p>
         )}
       </div>
 
-      {/* Result */}
-      {showResult && aiSummary && selectedCompany && (
-        <div className="space-y-5 animate-fade-in">
-          {/* Summary */}
-          <div className="rounded-xl border border-indigo-500/20 bg-zinc-900 p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <Zap className="h-4 w-4 text-indigo-400" />
-              <span className="font-semibold text-zinc-100">AI Analysis: {selectedCompany.name}</span>
-              <Badge variant="secondary" className="ml-auto text-[10px]">Mock · GPT-4o simulation</Badge>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Top analyses */}
+        <div className="lg:col-span-2 space-y-5">
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-emerald-400" />
+                <h3 className="font-semibold text-zinc-100">Hoogste Conviction Analyses</h3>
+              </div>
+              <Link href="/companies" className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+                Alle <ArrowRight className="h-3 w-3" />
+              </Link>
             </div>
-            <p className="text-sm text-zinc-300 leading-relaxed">{aiSummary.summary}</p>
+            {all.length === 0 ? (
+              <p className="text-sm text-zinc-500 text-center py-12">Pipeline is nog bezig.</p>
+            ) : (
+              <div className="divide-y divide-zinc-800/50">
+                {all.slice(0, 8).map((c) => (
+                  <Link key={c.id} href={`/companies/${c.slug}`}
+                    className="flex items-start gap-4 px-5 py-4 hover:bg-zinc-800/40 transition-colors group">
+                    <div className="h-9 w-9 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0">
+                      <span className="text-xs font-bold text-indigo-400">{c.ticker?.slice(0, 2)}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-sm font-semibold text-zinc-100">{c.name}</span>
+                        <span className="text-xs text-zinc-600 font-mono">{c.ticker}</span>
+                      </div>
+                      {c.summary && (
+                        <p className="text-xs text-zinc-500 line-clamp-2 leading-relaxed">{c.summary}</p>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={cn("text-lg font-bold tabular-nums", scoreColor(c.score_total ?? 0))}>{c.score_total}</p>
+                      <p className="text-xs text-zinc-700">/ 100</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Bull/Bear */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-5">
-              <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-3">🐂 Bull Case</p>
-              <p className="text-sm text-zinc-400 leading-relaxed">{aiSummary.bullCase}</p>
+          {/* Hoog risico alerts */}
+          {all.filter((c) => c.risk_level === "very-high").length > 0 && (
+            <div className="rounded-xl border border-red-500/20 bg-zinc-900">
+              <div className="flex items-center gap-2 px-5 py-4 border-b border-zinc-800">
+                <AlertTriangle className="h-4 w-4 text-red-400" />
+                <h3 className="font-semibold text-zinc-100">Zeer Hoog Risico</h3>
+              </div>
+              <div className="divide-y divide-zinc-800/50">
+                {all.filter((c) => c.risk_level === "very-high").map((c) => (
+                  <Link key={c.id} href={`/companies/${c.slug}`}
+                    className="flex items-center gap-3 px-5 py-3 hover:bg-zinc-800/40 transition-colors">
+                    <span className="text-xs font-bold text-red-400 w-12 shrink-0">{c.ticker}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-zinc-300 truncate">{c.name}</p>
+                    </div>
+                    <span className="text-sm font-bold text-red-400 shrink-0">{c.score_total}</span>
+                  </Link>
+                ))}
+              </div>
             </div>
-            <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-5">
-              <p className="text-xs font-bold text-red-400 uppercase tracking-wider mb-3">🐻 Bear Case</p>
-              <p className="text-sm text-zinc-400 leading-relaxed">{aiSummary.bearCase}</p>
-            </div>
-          </div>
+          )}
+        </div>
 
-          {/* Valuation scenarios */}
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-            <h4 className="font-semibold text-zinc-100 mb-4">Valuation Scenarios</h4>
-            <div className="grid grid-cols-3 gap-4">
-              {[
-                { label: "Bear Target",  value: aiSummary.valuationScenario.bear, color: "text-red-400",    border: "border-red-500/20" },
-                { label: "Base Target",  value: aiSummary.valuationScenario.base, color: "text-blue-400",   border: "border-blue-500/20" },
-                { label: "Bull Target",  value: aiSummary.valuationScenario.bull, color: "text-emerald-400",border: "border-emerald-500/20" },
-              ].map((s) => (
-                <div key={s.label} className={cn("rounded-lg border p-4 text-center", s.border)}>
-                  <p className="text-xs text-zinc-500 mb-1">{s.label}</p>
-                  <p className={cn("text-xl font-bold", s.color)}>{s.value}</p>
-                  <p className="text-xs text-zinc-600 mt-1">vs ${selectedCompany.stockPrice.toFixed(2)} today</p>
-                </div>
+        {/* Rechts: recent nieuws */}
+        <div className="space-y-5">
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900">
+            <div className="flex items-center gap-2 px-5 py-4 border-b border-zinc-800">
+              <Newspaper className="h-4 w-4 text-indigo-400" />
+              <h3 className="font-semibold text-zinc-100">Recent Nieuws</h3>
+            </div>
+            <div className="divide-y divide-zinc-800/50">
+              {news.length === 0 ? (
+                <p className="text-xs text-zinc-600 px-5 py-4">Nog geen nieuws opgehaald.</p>
+              ) : news.map((n) => (
+                <a key={n.id} href={n.url ?? "#"} target="_blank" rel="noopener noreferrer"
+                  className="block px-5 py-3.5 hover:bg-zinc-800/40 transition-colors">
+                  <div className="flex items-start gap-2 mb-1">
+                    <span className="text-[10px] font-bold text-indigo-400 shrink-0 mt-0.5">{n.company_ticker}</span>
+                    <p className="text-xs font-medium text-zinc-300 leading-snug line-clamp-2">{n.title}</p>
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-zinc-700">
+                    <span>{n.source}</span>
+                    {n.published_at && (
+                      <span>{new Date(n.published_at).toLocaleDateString("nl-NL")}</span>
+                    )}
+                  </div>
+                </a>
               ))}
             </div>
           </div>
 
-          {/* Key catalysts + Risks */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-              <h4 className="text-sm font-semibold text-zinc-300 mb-3">Key Catalysts</h4>
-              <ul className="space-y-2">
-                {aiSummary.keyCatalysts.map((c, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-zinc-400">
-                    <span className="text-indigo-400 font-bold shrink-0">{i + 1}.</span>{c}
-                  </li>
-                ))}
-              </ul>
+          {/* Komende catalysts sidebar */}
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900">
+            <div className="flex items-center gap-2 px-5 py-4 border-b border-zinc-800">
+              <Calendar className="h-4 w-4 text-amber-400" />
+              <h3 className="font-semibold text-zinc-100">Komende Catalysts</h3>
             </div>
-            <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-              <h4 className="text-sm font-semibold text-zinc-300 mb-3">Main Risks</h4>
-              <ul className="space-y-2">
-                {aiSummary.mainRisks.map((r, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-zinc-400">
-                    <span className="text-red-400 font-bold shrink-0">{i + 1}.</span>{r}
-                  </li>
-                ))}
-              </ul>
+            <div className="px-5 py-3">
+              <Link href="/catalysts" className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+                Bekijk alle catalysts <ArrowRight className="h-3 w-3" />
+              </Link>
             </div>
           </div>
-
-          {/* Thesis breakers */}
-          <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-5">
-            <h4 className="text-sm font-semibold text-red-400 mb-3">⚠️ Thesis Breakers</h4>
-            <ul className="space-y-2">
-              {aiSummary.thesisBreakers.map((b, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-zinc-400">
-                  <span className="text-red-400 font-bold shrink-0">✗</span>{b}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <Disclaimer />
         </div>
-      )}
-
-      {/* Feature explanation (when nothing selected) */}
-      {!showResult && !isGenerating && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[
-            { icon: "🎯", title: "Structured Output",   desc: "Bull case, bear case, valuation, catalysts, risks — all in one place" },
-            { icon: "⚡", title: "Instant Generation",  desc: "Full thesis generated in seconds using GPT-4o deep research" },
-            { icon: "🔒", title: "Not Financial Advice", desc: "AI analysis is for research only. Always do your own due diligence" },
-          ].map((f) => (
-            <div key={f.title} className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-              <div className="text-2xl mb-2">{f.icon}</div>
-              <p className="text-sm font-semibold text-zinc-300 mb-1">{f.title}</p>
-              <p className="text-xs text-zinc-600">{f.desc}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      </div>
     </div>
   )
 }

@@ -1,184 +1,135 @@
-"use client"
-
-import { useState, useMemo } from "react"
-import { Calendar, Filter } from "lucide-react"
-import { catalysts } from "@/data/mock/catalysts"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Disclaimer } from "@/components/shared/disclaimer"
-import { cn } from "@/lib/utils"
+import { supabaseAdmin } from "@/lib/supabase/admin"
 import Link from "next/link"
+import { Calendar, AlertTriangle } from "lucide-react"
+import { cn } from "@/lib/utils"
 
-const catalystTypes = ["Earnings", "Product Launch", "Regulatory", "Investor Day", "Contract", "Partnership", "Launch", "FDA Milestone", "Financing", "Conference"] as const
+export const metadata = { title: "Catalysts" }
+export const revalidate = 3600
 
 function impactCls(level: string) {
-  if (level === "Critical") return "bg-red-500/10 text-red-400 border border-red-500/20"
-  if (level === "High")     return "bg-orange-500/10 text-orange-400 border border-orange-500/20"
-  if (level === "Medium")   return "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-  return "bg-zinc-800 text-zinc-500"
+  if (level === "Critical") return "text-red-400 bg-red-500/10 border border-red-500/20"
+  if (level === "High")     return "text-orange-400 bg-orange-500/10 border border-orange-500/20"
+  if (level === "Medium")   return "text-amber-400 bg-amber-500/10 border border-amber-500/20"
+  return "text-zinc-400 bg-zinc-800 border border-zinc-700"
 }
 
 function typeCls(type: string) {
   const map: Record<string, string> = {
-    "Earnings":       "bg-blue-500/10 text-blue-400",
-    "Product Launch": "bg-violet-500/10 text-violet-400",
-    "Regulatory":     "bg-orange-500/10 text-orange-400",
-    "Contract":       "bg-emerald-500/10 text-emerald-400",
-    "Launch":         "bg-sky-500/10 text-sky-400",
-    "Partnership":    "bg-cyan-500/10 text-cyan-400",
-    "Financing":      "bg-red-500/10 text-red-400",
-    "Investor Day":   "bg-indigo-500/10 text-indigo-400",
-    "Conference":     "bg-zinc-700 text-zinc-400",
+    "Launch":         "text-indigo-400 bg-indigo-500/10",
+    "Earnings":       "text-blue-400 bg-blue-500/10",
+    "Regulatory":     "text-purple-400 bg-purple-500/10",
+    "Contract":       "text-emerald-400 bg-emerald-500/10",
+    "Product Launch": "text-cyan-400 bg-cyan-500/10",
+    "Partnership":    "text-teal-400 bg-teal-500/10",
+    "Financing":      "text-amber-400 bg-amber-500/10",
   }
-  return map[type] ?? "bg-zinc-800 text-zinc-500"
+  return map[type] ?? "text-zinc-400 bg-zinc-800"
 }
 
-function confidenceColor(v: number) {
-  if (v >= 80) return "text-emerald-400"
-  if (v >= 60) return "text-blue-400"
-  if (v >= 40) return "text-amber-400"
-  return "text-red-400"
-}
+export default async function CatalystsPage() {
+  const { data } = await supabaseAdmin
+    .from("upcoming_catalysts")
+    .select("*")
+    .order("catalyst_date", { ascending: true, nullsFirst: false })
 
-export default function CatalystsPage() {
-  const [type, setType] = useState("all")
-  const [impact, setImpact] = useState("all")
-  const [period, setPeriod] = useState("upcoming")
+  const all = data ?? []
+  const critical = all.filter((c) => c.impact_level === "Critical" || c.impact_level === "High")
 
-  const filtered = useMemo(() => {
-    return catalysts
-      .filter((c) => {
-        const matchType   = type === "all" || c.type === type
-        const matchImpact = impact === "all" || c.impactLevel === impact
-        const matchPeriod = period === "all" || (period === "upcoming" && c.isUpcoming)
-        return matchType && matchImpact && matchPeriod
-      })
-      .sort((a, b) => {
-        const da = a.date ?? "2099-01-01"
-        const db = b.date ?? "2099-01-01"
-        return new Date(da).getTime() - new Date(db).getTime()
-      })
-  }, [type, impact, period])
-
-  // Group by month
-  const grouped = useMemo(() => {
-    const map = new Map<string, typeof filtered>()
-    filtered.forEach((c) => {
-      const key = c.date
-        ? new Date(c.date).toLocaleDateString("en-US", { month: "long", year: "numeric" })
-        : c.estimatedPeriod ?? "TBD"
-      if (!map.has(key)) map.set(key, [])
-      map.get(key)!.push(c)
-    })
-    return map
-  }, [filtered])
+  // Groepeer per periode
+  const grouped: Record<string, typeof all> = {}
+  for (const cat of all) {
+    const key = cat.estimated_period
+      ?? (cat.catalyst_date
+        ? new Date(cat.catalyst_date).toLocaleDateString("nl-NL", { month: "long", year: "numeric" })
+        : "Onbekend")
+    if (!grouped[key]) grouped[key] = []
+    grouped[key].push(cat)
+  }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-5 animate-fade-in">
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="upcoming">Upcoming</SelectItem>
-            <SelectItem value="all">All events</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={type} onValueChange={setType}>
-          <SelectTrigger className="w-44">
-            <Filter className="h-3.5 w-3.5 text-zinc-500 mr-1" />
-            <SelectValue placeholder="All types" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All types</SelectItem>
-            {catalystTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        <Select value={impact} onValueChange={setImpact}>
-          <SelectTrigger className="w-40"><SelectValue placeholder="Any impact" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Any impact</SelectItem>
-            <SelectItem value="Critical">Critical</SelectItem>
-            <SelectItem value="High">High</SelectItem>
-            <SelectItem value="Medium">Medium</SelectItem>
-            <SelectItem value="Low">Low</SelectItem>
-          </SelectContent>
-        </Select>
-        <span className="text-xs text-zinc-600 ml-auto">{filtered.length} events</span>
+    <div className="max-w-5xl mx-auto space-y-6">
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: "Totaal",    value: all.length,                                              color: "text-indigo-400" },
+          { label: "Kritisch",  value: all.filter((c) => c.impact_level === "Critical").length, color: "text-red-400" },
+          { label: "Hoog",      value: all.filter((c) => c.impact_level === "High").length,     color: "text-orange-400" },
+          { label: "Bedrijven", value: new Set(all.map((c) => c.company_ticker)).size,          color: "text-emerald-400" },
+        ].map((s) => (
+          <div key={s.label} className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">{s.label}</p>
+            <p className={cn("text-2xl font-bold tabular-nums", s.color)}>{s.value}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Timeline */}
-      {grouped.size === 0 ? (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 py-16 text-center text-zinc-600 text-sm">
-          No catalysts match your filters
-        </div>
-      ) : (
-        Array.from(grouped.entries()).map(([month, events]) => (
-          <div key={month}>
-            <div className="flex items-center gap-3 mb-3">
-              <Calendar className="h-4 w-4 text-indigo-400" />
-              <h3 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">{month}</h3>
-              <div className="flex-1 h-px bg-zinc-800" />
-              <span className="text-xs text-zinc-600">{events.length}</span>
-            </div>
-            <div className="space-y-2">
-              {events.map((cat) => (
-                <div key={cat.id} className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 hover:border-zinc-700 transition-colors">
-                  <div className="flex items-start gap-4">
-                    {/* Date */}
-                    <div className="text-center min-w-[52px] pt-0.5">
-                      {cat.date ? (
-                        <>
-                          <p className="text-lg font-bold text-zinc-100 leading-none">
-                            {new Date(cat.date).getDate()}
-                          </p>
-                          <p className="text-xs text-zinc-600">
-                            {new Date(cat.date).toLocaleDateString("en-US", { month: "short" })}
-                          </p>
-                        </>
-                      ) : (
-                        <p className="text-xs text-zinc-600">{cat.estimatedPeriod}</p>
-                      )}
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <Link href={`/companies/${cat.companyTicker.toLowerCase()}`} className="font-semibold text-zinc-200 hover:text-white text-sm">
-                          {cat.companyTicker}
-                        </Link>
-                        <span className="text-zinc-500 text-sm">—</span>
-                        <span className="text-sm text-zinc-300">{cat.title}</span>
-                      </div>
-                      <p className="text-xs text-zinc-500 mb-2">{cat.description}</p>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={cn("text-xs rounded-md px-2 py-0.5 font-medium", typeCls(cat.type))}>{cat.type}</span>
-                        <span className={cn("text-xs rounded-md px-2 py-0.5 border font-medium", impactCls(cat.impactLevel))}>{cat.impactLevel}</span>
-                        <span className="text-xs text-zinc-600">
-                          Confidence: <span className={cn("font-medium", confidenceColor(cat.confidenceLevel))}>{cat.confidenceLevel}%</span>
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Confidence ring */}
-                    <div className="shrink-0 hidden sm:flex flex-col items-center gap-1">
-                      <div
-                        className="relative w-10 h-10 rounded-full"
-                        style={{ background: `conic-gradient(${cat.confidenceLevel >= 75 ? "#10b981" : cat.confidenceLevel >= 50 ? "#3b82f6" : "#f59e0b"} ${cat.confidenceLevel * 3.6}deg, #27272a 0deg)` }}
-                      >
-                        <div className="absolute inset-1 rounded-full bg-zinc-900 flex items-center justify-center">
-                          <span className="text-[10px] font-bold text-zinc-300">{cat.confidenceLevel}</span>
-                        </div>
-                      </div>
-                    </div>
+      {/* Kritische events */}
+      {critical.length > 0 && (
+        <div className="rounded-xl border border-red-500/20 bg-zinc-900">
+          <div className="flex items-center gap-2 px-5 py-4 border-b border-zinc-800">
+            <AlertTriangle className="h-4 w-4 text-red-400" />
+            <h3 className="font-semibold text-zinc-100">Kritische & Hoge Impact Events</h3>
+          </div>
+          <div className="divide-y divide-zinc-800/50">
+            {critical.slice(0, 8).map((cat) => (
+              <Link key={cat.id} href={`/companies/${cat.company_id}`}
+                className="flex items-center gap-4 px-5 py-3.5 hover:bg-zinc-800/40 transition-colors">
+                <div className="shrink-0 h-9 w-9 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+                  <span className="text-xs font-bold text-indigo-400">{cat.company_ticker?.slice(0, 2)}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-zinc-200 truncate">
+                    <span className="text-zinc-500 mr-2">{cat.company_ticker}</span>{cat.title}
+                  </p>
+                  <div className="flex items-center gap-3 mt-1 text-xs text-zinc-600">
+                    <span>{cat.estimated_period ?? cat.catalyst_date ?? "TBD"}</span>
+                    <span className={cn("rounded px-1.5 py-0.5 font-medium", typeCls(cat.catalyst_type))}>{cat.catalyst_type}</span>
                   </div>
                 </div>
-              ))}
-            </div>
+                <span className={cn("shrink-0 text-xs rounded-md px-1.5 py-0.5 font-medium", impactCls(cat.impact_level))}>
+                  {cat.impact_level}
+                </span>
+              </Link>
+            ))}
           </div>
-        ))
+        </div>
       )}
 
-      <Disclaimer compact />
+      {/* Timeline */}
+      {Object.keys(grouped).length === 0 ? (
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-12 text-center">
+          <Calendar className="h-8 w-8 text-zinc-700 mx-auto mb-3" />
+          <p className="text-sm text-zinc-500">Pipeline is nog bezig — catalysts verschijnen na de eerste run.</p>
+        </div>
+      ) : Object.entries(grouped).map(([period, cats]) => (
+        <div key={period} className="rounded-xl border border-zinc-800 bg-zinc-900">
+          <div className="flex items-center gap-2 px-5 py-3 border-b border-zinc-800 bg-zinc-950/30">
+            <Calendar className="h-3.5 w-3.5 text-zinc-600" />
+            <h3 className="text-sm font-semibold text-zinc-400 capitalize">{period}</h3>
+            <span className="text-xs text-zinc-700 ml-auto">{cats.length} events</span>
+          </div>
+          <div className="divide-y divide-zinc-800/50">
+            {cats.map((cat) => (
+              <Link key={cat.id} href={`/companies/${cat.company_id}`}
+                className="flex items-center gap-4 px-5 py-3.5 hover:bg-zinc-800/40 transition-colors">
+                <span className="text-xs font-bold text-indigo-400 w-10 shrink-0">{cat.company_ticker}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-zinc-200 truncate">{cat.title}</p>
+                  <span className={cn("text-[10px] rounded px-1.5 py-0.5 font-medium mt-1 inline-block", typeCls(cat.catalyst_type))}>
+                    {cat.catalyst_type}
+                  </span>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className={cn("text-xs rounded-md px-1.5 py-0.5 font-medium", impactCls(cat.impact_level))}>
+                    {cat.impact_level}
+                  </span>
+                  <p className="text-xs text-zinc-700 mt-1">{cat.confidence_level}%</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
