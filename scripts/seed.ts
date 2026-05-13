@@ -259,19 +259,23 @@ async function saveAnalysis(companyId: string, analysis: Awaited<ReturnType<type
 async function main() {
   console.log("=== Nuncora Seed Pipeline ===\n")
 
-  // 1. Get existing tickers
-  const { data: existing } = await supabase.from("companies").select("ticker").eq("is_active", true)
-  const existingSet = new Set((existing ?? []).map(c => c.ticker.toUpperCase()))
-  console.log(`Bestaande bedrijven in DB: ${existingSet.size}`)
+  // 1. Haal bestaande tickers op + welke al een score hebben
+  const { data: existing }  = await supabase.from("companies").select("ticker").eq("is_active", true)
+  const { data: noScore }   = await supabase.from("companies_with_latest_analysis").select("ticker").is("score_total", null)
+  const existingSet         = new Set((existing ?? []).map(c => c.ticker.toUpperCase()))
+  const missingScoreTickers = (noScore ?? []).map(c => c.ticker.toUpperCase())
 
-  // 2. Discovery
+  console.log(`Bestaande bedrijven in DB: ${existingSet.size}`)
+  console.log(`Bedrijven zonder score:    ${missingScoreTickers.length}`)
+
+  // 2. Discovery — alleen nieuwe tickers ophalen
   console.log("\n[1/3] Discovery — Claude genereert kandidaten...")
   const candidates = await discover()
   console.log(`  ✓ ${candidates.length} kandidaten gegenereerd`)
 
-  // 3. FMP validation
+  // 3. FMP validatie voor nieuwe kandidaten
   console.log("\n[2/3] FMP validatie — marktcap filter $50M–$5B...")
-  const validated: Array<{ ticker: string; profile: FMPProfile }> = []
+  const newlyValidated: Array<{ ticker: string; profile: FMPProfile }> = []
   const batchSize = 5
 
   for (let i = 0; i < candidates.length; i += batchSize) {
@@ -284,18 +288,37 @@ async function main() {
       return { ticker: c.ticker.toUpperCase(), profile: p }
     }))
     for (const r of results) {
-      if (r.status === "fulfilled" && r.value) validated.push(r.value)
+      if (r.status === "fulfilled" && r.value) newlyValidated.push(r.value)
     }
     process.stdout.write(`  ${Math.min(i + batchSize, candidates.length)}/${candidates.length} gecontroleerd...\r`)
     if (i + batchSize < candidates.length) await new Promise(r => setTimeout(r, 500))
   }
-  console.log(`\n  ✓ ${validated.length} nieuwe bedrijven voldoen aan criteria`)
+  console.log(`\n  ✓ ${newlyValidated.length} nieuwe bedrijven voldoen aan criteria`)
 
-  // 4. Analyse per bedrijf
-  console.log(`\n[3/3] Claude analyse (${validated.length} bedrijven) — dit duurt ~${Math.ceil(validated.length * 20 / 60)} minuten...\n`)
+  // FMP profielen ophalen voor bedrijven die al in DB zitten maar geen score hebben
+  const missingProfiles: Array<{ ticker: string; profile: FMPProfile }> = []
+  if (missingScoreTickers.length > 0) {
+    console.log(`\n  Profiel ophalen voor ${missingScoreTickers.length} bedrijven zonder score...`)
+    for (let i = 0; i < missingScoreTickers.length; i += batchSize) {
+      const batch = missingScoreTickers.slice(i, i + batchSize)
+      const results = await Promise.allSettled(batch.map(async ticker => {
+        const p = await getProfile(ticker)
+        if (!p) return null
+        return { ticker, profile: p }
+      }))
+      for (const r of results) {
+        if (r.status === "fulfilled" && r.value) missingProfiles.push(r.value)
+      }
+      if (i + batchSize < missingScoreTickers.length) await new Promise(r => setTimeout(r, 300))
+    }
+  }
+
+  // Combineer: eerst bedrijven zonder score, dan nieuwe ontdekkingen
+  const toAnalyze = [...missingProfiles, ...newlyValidated]
+  console.log(`\n[3/3] Claude analyse (${toAnalyze.length} bedrijven) — ~${Math.ceil(toAnalyze.length * 20 / 60)} minuten...\n`)
   let done = 0, errors = 0
 
-  for (const { ticker, profile } of validated) {
+  for (const { ticker, profile } of toAnalyze) {
     try {
       process.stdout.write(`  Analyseer ${ticker.padEnd(8)}...`)
 
@@ -318,7 +341,7 @@ async function main() {
     triggered_by: "local-seed",
     status: errors === 0 ? "success" : done > 0 ? "partial" : "failed",
     finished_at: new Date().toISOString(),
-    companies_found: validated.length,
+    companies_found: toAnalyze.length,
     companies_new: done,
     companies_updated: 0,
     analyses_run: done,
