@@ -56,8 +56,9 @@ async function pipeline(triggeredBy: string, skipDiscovery = false, batchSize = 
     const existingTickers = existing?.map((c) => c.ticker) ?? []
     log.push(`Bestaande bedrijven: ${existingTickers.length}`)
 
-    // ── Stap 2: Discovery — alleen als DB weinig bedrijven heeft ────
-    const runDiscovery = !skipDiscovery && existingTickers.length < DISCOVERY_THRESHOLD
+    // ── Stap 2: Discovery — bij weinig bedrijven of elke zondag ────
+    const isSunday = new Date().getUTCDay() === 0
+    const runDiscovery = !skipDiscovery && (existingTickers.length < DISCOVERY_THRESHOLD || isSunday)
 
     if (runDiscovery) {
       log.push("Discovery gestart — Claude genereert kandidaten...")
