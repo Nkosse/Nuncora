@@ -14,6 +14,7 @@ import {
   User,
   ChevronRight,
   Zap,
+  X,
 } from "lucide-react"
 
 const navItems = [
@@ -25,17 +26,22 @@ const navItems = [
   { href: "/ai-research", label: "Research",   icon: Brain },
 ]
 
-export function Sidebar() {
+export function Sidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname()
 
   return (
     <aside className="flex h-screen w-56 shrink-0 flex-col border-r border-zinc-800 bg-zinc-950">
       {/* Logo */}
-      <div className="flex h-16 items-center gap-2.5 border-b border-zinc-800 px-4">
+      <div className="flex h-14 items-center gap-2.5 border-b border-zinc-800 px-4">
         <ConvexLogo size="md" />
         <span className="ml-auto text-[10px] font-semibold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 rounded px-1.5 py-0.5">
           BETA
         </span>
+        {onClose && (
+          <button onClick={onClose} className="ml-1 md:hidden p-1 rounded text-zinc-600 hover:text-zinc-300">
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Main nav */}
@@ -47,6 +53,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onClose}
               className={cn(
                 "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-all duration-150 group",
                 isActive
