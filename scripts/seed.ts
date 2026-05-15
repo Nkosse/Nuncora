@@ -14,6 +14,7 @@ config({ path: resolve(process.cwd(), ".env.local") })
 
 import { createClient } from "@supabase/supabase-js"
 import Anthropic from "@anthropic-ai/sdk"
+import { getFinancialSnapshot, formatFinancialsForPrompt } from "../lib/sec/client"
 
 // ── Clients ────────────────────────────────────────────────────────────────
 
@@ -33,7 +34,7 @@ interface FMPProfile {
   symbol: string; companyName: string; price: number; marketCap: number
   beta: number; exchange: string; industry: string; website: string
   description: string; ceo: string; sector: string; fullTimeEmployees: string
-  ipoDate: string; isActivelyTrading: boolean
+  ipoDate: string; isActivelyTrading: boolean; cik?: string | null
 }
 
 async function getProfile(ticker: string): Promise<FMPProfile | null> {
@@ -127,11 +128,19 @@ async function discover(): Promise<{ ticker: string; rationale: string }[]> {
 
 // ── Claude analysis ────────────────────────────────────────────────────────
 
-async function analyze(ticker: string, profile: FMPProfile, news: NewsArticle[]) {
+async function analyze(ticker: string, profile: FMPProfile, news: NewsArticle[], financials: Awaited<ReturnType<typeof getFinancialSnapshot>>) {
   const today    = new Date().toISOString().split("T")[0]
   const newsText = news.length > 0
     ? "\nRecent nieuws:\n" + news.map((n, i) => `${i+1}. [${n.source}] ${n.title}\n   ${n.summary}`).join("\n")
     : "\nGeen recent nieuws."
+
+  const financialsText = financials
+    ? "\n" + formatFinancialsForPrompt(financials) + "\n"
+    : "\n(Geen SEC-financiële data beschikbaar — gebruik trainingskennis.)\n"
+
+  const psRatio = financials?.revenueAnnual && financials.revenueAnnual > 0
+    ? (profile.marketCap / financials.revenueAnnual).toFixed(1)
+    : null
 
   const msg = await anthropic.messages.create({
     model: "claude-opus-4-7",
@@ -142,15 +151,25 @@ async function analyze(ticker: string, profile: FMPProfile, news: NewsArticle[])
 Analyseer ${ticker} (${profile.companyName}) op asymmetrisch opwaarts potentieel.
 
 === MARKTDATA ===
-Prijs: $${profile.price} | Market Cap: $${(profile.marketCap/1e9).toFixed(2)}B | Beta: ${profile.beta}
+Prijs: $${profile.price} | Market Cap: $${(profile.marketCap/1e9).toFixed(2)}B | P/S: ${psRatio ?? "n/b"}x | Beta: ${profile.beta}
 Sector: ${profile.sector} / ${profile.industry} | CEO: ${profile.ceo}
 Medewerkers: ${profile.fullTimeEmployees} | Beurs: ${profile.exchange} | IPO: ${profile.ipoDate}
 
 === BESCHRIJVING ===
 ${profile.description}
+${financialsText}
 ${newsText}
 
-Gebruik trainingskennis + bovenstaande data. Wees specifiek — noem producten, contracten, klanten bij naam.
+=== INSTRUCTIES ===
+Gebruik de SEC-KERNCIJFERS hierboven als primaire bron voor financiële scores. Combineer met trainingskennis voor kwalitatieve factoren.
+
+Let speciaal op:
+- cashRunway: gebruik berekende maanden; < 12 mnd = score ≤ 3, 12-24 mnd = 4-6, > 24 mnd of FCF positief = 7-10
+- revenueGrowth: baseer op werkelijke YoY% uit SEC data
+- dilutionRisk: verhoog als schuld hoog of cash runway kort
+- valuationDiscount: gebruik P/S ratio t.o.v. sectorgenoten
+
+Wees specifiek — noem producten, contracten, klanten bij naam.
 
 Retourneer UITSLUITEND geldig JSON:
 {
@@ -325,10 +344,11 @@ async function main() {
     try {
       process.stdout.write(`  Analyseer ${ticker.padEnd(8)}...`)
 
-      const companyId = await saveCompany(profile)
-      const news      = await fetchNews(ticker, profile.companyName)
+      const companyId  = await saveCompany(profile)
+      const news       = await fetchNews(ticker, profile.companyName)
       await saveNews(companyId, ticker, news)
-      const analysis  = await analyze(ticker, profile, news)
+      const financials = profile.cik ? await getFinancialSnapshot(profile.cik).catch(() => null) : null
+      const analysis   = await analyze(ticker, profile, news, financials)
       await saveAnalysis(companyId, analysis)
 
       console.log(` score ${analysis.asymmetricScore.total}/100  [${analysis.riskLevel}]`)

@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk"
 import type { NewsArticle } from "@/lib/news/client"
+import { type FinancialSnapshot, formatFinancialsForPrompt } from "@/lib/sec/client"
 
 export const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -56,16 +57,24 @@ export async function analyzeCompany(
     ipoDate: string
     beta: number
   },
-  news: NewsArticle[] = []
+  news: NewsArticle[] = [],
+  financials: FinancialSnapshot | null = null
 ): Promise<CompanyAnalysis> {
   const today = new Date().toISOString().split("T")[0]
 
   const newsSection =
     news.length > 0
-      ? `\nRecent nieuws (laatste 48 uur):\n${news
-          .map((n, i) => `${i + 1}. [${n.source}] ${n.title}\n   ${n.summary}`)
-          .join("\n")}`
+      ? `\nRecent nieuws:\n${news.map((n, i) => `${i + 1}. [${n.source}] ${n.title}\n   ${n.summary}`).join("\n")}`
       : "\nGeen recent nieuws beschikbaar."
+
+  const financialsSection = financials
+    ? `\n${formatFinancialsForPrompt(financials)}\n`
+    : "\n(Geen SEC-financiële data beschikbaar — gebruik trainingskennis voor financiële inschatting.)\n"
+
+  // Bereken P/S ratio als we revenue hebben
+  const psRatio = financials?.revenueAnnual && financials.revenueAnnual > 0
+    ? (profile.marketCap / financials.revenueAnnual).toFixed(1)
+    : null
 
   const prompt = `Je bent een expert investment analyst gespecialiseerd in asymmetrische kansen in future-tech smallcap aandelen. Vandaag is het ${today}.
 
@@ -74,6 +83,7 @@ Analyseer ${ticker} (${profile.name}) grondig op asymmetrisch opwaarts potentiee
 === LIVE MARKTDATA ===
 - Prijs: $${profile.price}
 - Market Cap: $${(profile.marketCap / 1e9).toFixed(2)}B
+- P/S ratio: ${psRatio ?? "n/b"}x
 - Beta: ${profile.beta}
 - Sector: ${profile.sector} / ${profile.industry}
 - CEO: ${profile.ceo}
@@ -83,10 +93,17 @@ Analyseer ${ticker} (${profile.name}) grondig op asymmetrisch opwaarts potentiee
 
 === BEDRIJFSBESCHRIJVING ===
 ${profile.description}
+${financialsSection}
 ${newsSection}
 
 === INSTRUCTIES ===
-Gebruik je trainingskennis over dit bedrijf (financiën, technologie, concurrenten, contracten, management) IN COMBINATIE met de live marktdata en het nieuws hierboven.
+Gebruik de bovenstaande OFFICIËLE SEC-KERNCIJFERS als primaire bron voor financiële scores (revenueGrowth, cashRunway, dilutionRisk). Combineer dit met je trainingskennis over dit bedrijf voor kwalitatieve factoren (technologie, concurrenten, management, catalysts).
+
+Let speciaal op:
+- cashRunway: gebruik de berekende maanden cash runway als die beschikbaar is; < 12 maanden = score ≤ 3, 12-24 mnd = 4-6, > 24 mnd of FCF positief = 7-10
+- revenueGrowth: baseer op de werkelijke YoY groeicijfers uit SEC data
+- dilutionRisk: verhoog dit risico als de schuld hoog is of cash runway kort
+- valuationDiscount: gebruik de P/S ratio t.o.v. sectorgenoten
 
 Geef een grondige, genuanceerde analyse. Wees specifiek — noem producten, contracten, klanten, concurrenten bij naam. Vermijd generieke uitspraken.
 

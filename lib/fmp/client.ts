@@ -36,6 +36,7 @@ export interface FMPProfile {
   ipoDate: string
   image: string
   isActivelyTrading: boolean
+  cik: string | null
 }
 
 export async function getCompanyProfile(ticker: string): Promise<FMPProfile | null> {
