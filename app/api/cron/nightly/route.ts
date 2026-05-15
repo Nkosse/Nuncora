@@ -152,20 +152,28 @@ async function pipeline(triggeredBy: string, skipDiscovery = false, batchSize = 
         const news = await fetchNewsForTicker(ticker, profile.companyName)
         newsFetched += news.length
 
-        // Nieuws opslaan (skip duplicaten)
+        // Nieuws opslaan — filter eerst bestaande URLs
         if (news.length > 0) {
-          await supabaseAdmin.from("company_news").upsert(
-            news.map((n) => ({
-              company_id: companyId,
-              ticker,
-              title: n.title,
-              summary: n.summary,
-              url: n.url || null,
-              source: n.source,
-              published_at: n.publishedAt,
-            })),
-            { onConflict: "url", ignoreDuplicates: true }
-          )
+          const { data: existing } = await supabaseAdmin
+            .from("company_news")
+            .select("url")
+            .eq("company_id", companyId)
+          const existingUrls = new Set((existing ?? []).map(r => r.url).filter(Boolean))
+          const newArticles  = news.filter(n => n.url && !existingUrls.has(n.url))
+          if (newArticles.length > 0) {
+            await supabaseAdmin.from("company_news").insert(
+              newArticles.map((n) => ({
+                company_id:   companyId,
+                ticker,
+                title:        n.title,
+                summary:      n.summary,
+                url:          n.url,
+                source:       n.source,
+                published_at: n.publishedAt,
+              }))
+            )
+          }
+          newsFetched += newArticles.length
         }
 
         // Claude deep analysis

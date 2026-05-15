@@ -19,6 +19,39 @@ export async function POST(req: NextRequest) {
   return refreshNews()
 }
 
+async function saveArticles(
+  companyId: string,
+  ticker: string,
+  articles: { title: string; summary: string; url: string; source: string; publishedAt: string }[]
+): Promise<number> {
+  if (!articles.length) return 0
+
+  // Haal bestaande URLs op voor dit bedrijf om duplicaten te voorkomen
+  const { data: existing } = await supabaseAdmin
+    .from("company_news")
+    .select("url")
+    .eq("company_id", companyId)
+
+  const existingUrls = new Set((existing ?? []).map(r => r.url).filter(Boolean))
+  const newArticles  = articles.filter(a => a.url && !existingUrls.has(a.url))
+
+  if (!newArticles.length) return 0
+
+  const { error } = await supabaseAdmin.from("company_news").insert(
+    newArticles.map(a => ({
+      company_id:   companyId,
+      ticker,
+      title:        a.title,
+      summary:      a.summary,
+      url:          a.url,
+      source:       a.source,
+      published_at: a.publishedAt,
+    }))
+  )
+  if (error) throw error
+  return newArticles.length
+}
+
 async function refreshNews() {
   const { data: companies } = await supabaseAdmin
     .from("companies")
@@ -33,7 +66,7 @@ async function refreshNews() {
   let articlesAdded = 0
   let errors = 0
 
-  // Haal nieuws op in batches van 16 parallel — alle 64 bedrijven klaar in ~6s
+  // Haal nieuws op in batches van 16 parallel
   const BATCH = 16
   for (let i = 0; i < companies.length; i += BATCH) {
     const batch = companies.slice(i, i + BATCH)
@@ -41,22 +74,7 @@ async function refreshNews() {
     const results = await Promise.allSettled(
       batch.map(async (company) => {
         const articles = await fetchNewsForTicker(company.ticker, company.name)
-        if (!articles.length) return 0
-
-        const { error } = await supabaseAdmin.from("company_news").upsert(
-          articles.map((a) => ({
-            company_id:  company.ticker.toLowerCase(),
-            ticker:      company.ticker,
-            title:       a.title,
-            summary:     a.summary,
-            url:         a.url || null,
-            source:      a.source,
-            published_at: a.publishedAt,
-          })),
-          { onConflict: "url", ignoreDuplicates: true }
-        )
-        if (error) throw error
-        return articles.length
+        return saveArticles(company.ticker.toLowerCase(), company.ticker, articles)
       })
     )
 
@@ -65,9 +83,8 @@ async function refreshNews() {
       else errors++
     }
 
-    // Korte pauze tussen batches om Google niet te overbelasten
     if (i + BATCH < companies.length) {
-      await new Promise((r) => setTimeout(r, 300))
+      await new Promise(r => setTimeout(r, 300))
     }
   }
 

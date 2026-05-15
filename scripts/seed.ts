@@ -208,9 +208,12 @@ async function saveCompany(profile: FMPProfile) {
 
 async function saveNews(companyId: string, ticker: string, news: NewsArticle[]) {
   if (!news.length) return
-  await supabase.from("company_news").upsert(
-    news.map(n => ({ company_id: companyId, ticker, title: n.title, summary: n.summary, url: n.url || null, source: n.source, published_at: n.publishedAt })),
-    { onConflict: "url", ignoreDuplicates: true }
+  const { data: existing } = await supabase.from("company_news").select("url").eq("company_id", companyId)
+  const existingUrls = new Set((existing ?? []).map(r => r.url).filter(Boolean))
+  const newArticles  = news.filter(n => n.url && !existingUrls.has(n.url))
+  if (!newArticles.length) return
+  await supabase.from("company_news").insert(
+    newArticles.map(n => ({ company_id: companyId, ticker, title: n.title, summary: n.summary, url: n.url, source: n.source, published_at: n.publishedAt }))
   )
 }
 
