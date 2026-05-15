@@ -2,7 +2,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin"
 import { CompaniesClient } from "./companies-client"
 
 export const metadata = { title: "Bedrijven" }
-export const revalidate = 3600
+export const revalidate = 300
 
 export default async function CompaniesPage() {
   const { data } = await supabaseAdmin

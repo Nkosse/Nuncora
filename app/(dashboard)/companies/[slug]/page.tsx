@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils"
 import { FinancialTab } from "./financial-tab"
 import { PriceChart } from "./price-chart"
 
-export const revalidate = 1800
+export const revalidate = 300
 
 function scoreColor(s: number) {
   if (s >= 80) return "text-emerald-400"

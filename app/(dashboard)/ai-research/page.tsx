@@ -4,7 +4,7 @@ import { Brain, TrendingUp, AlertTriangle, Calendar, ArrowRight, Newspaper } fro
 import { cn } from "@/lib/utils"
 
 export const metadata = { title: "Research" }
-export const revalidate = 3600
+export const revalidate = 300
 
 function scoreColor(s: number) {
   if (s >= 80) return "text-emerald-400"

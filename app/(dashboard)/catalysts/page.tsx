@@ -4,7 +4,7 @@ import { Calendar, AlertTriangle } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export const metadata = { title: "Catalysts" }
-export const revalidate = 3600
+export const revalidate = 300
 
 function impactCls(level: string) {
   if (level === "Critical") return "text-red-400 bg-red-500/10 border border-red-500/20"
