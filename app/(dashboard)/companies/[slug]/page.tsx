@@ -1,12 +1,13 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, AlertTriangle, Calendar, Newspaper, Brain, BarChart2 } from "lucide-react"
+import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, AlertTriangle, Calendar, Newspaper, Brain, BarChart2, LineChart } from "lucide-react"
 import { supabaseAdmin } from "@/lib/supabase/admin"
 import { Disclaimer } from "@/components/shared/disclaimer"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { FinancialTab } from "./financial-tab"
+import { PriceChart } from "./price-chart"
 
 export const revalidate = 1800
 
@@ -158,8 +159,11 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
 
       {/* Tabs */}
       <Tabs defaultValue="overview">
-        <TabsList className="w-full md:w-auto">
+        <TabsList className="w-full md:w-auto flex-wrap h-auto gap-1">
           <TabsTrigger value="overview">Overzicht</TabsTrigger>
+          <TabsTrigger value="chart" className="gap-1.5">
+            <LineChart className="h-3.5 w-3.5" /> Grafiek
+          </TabsTrigger>
           <TabsTrigger value="financials" className="gap-1.5">
             <BarChart2 className="h-3.5 w-3.5" /> Financieel
           </TabsTrigger>
@@ -277,6 +281,12 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               </div>
             </div>
           )}
+        </TabsContent>
+
+        {/* Grafiek */}
+        <TabsContent value="chart" className="mt-5">
+          <PriceChart ticker={company.ticker} exchange={company.exchange} />
+          <p className="mt-2 text-xs text-zinc-700 text-right">Grafiek via TradingView · weekkoers</p>
         </TabsContent>
 
         {/* Financieel */}
