@@ -30,7 +30,7 @@ function riskColor(level: string) {
 
 export default async function DashboardPage() {
   // Data ophalen uit Supabase
-  const [companiesRes, catalystsRes, runRes] = await Promise.allSettled([
+  const [companiesRes, catalystsRes, runRes, lastNewsRes, lastAnalysisRes] = await Promise.allSettled([
     supabaseAdmin
       .from("companies_with_latest_analysis")
       .select("*")
@@ -47,11 +47,43 @@ export default async function DashboardPage() {
       .order("finished_at", { ascending: false })
       .limit(1)
       .single(),
+    supabaseAdmin
+      .from("company_news")
+      .select("fetched_at")
+      .order("fetched_at", { ascending: false })
+      .limit(1)
+      .single(),
+    supabaseAdmin
+      .from("ai_analyses")
+      .select("generated_at")
+      .order("generated_at", { ascending: false })
+      .limit(1)
+      .single(),
   ])
 
-  const companies = companiesRes.status === "fulfilled" ? (companiesRes.value.data ?? []) : []
-  const catalysts = catalystsRes.status === "fulfilled" ? (catalystsRes.value.data ?? []) : []
-  const lastRun   = runRes.status === "fulfilled" ? runRes.value.data : null
+  const companies    = companiesRes.status    === "fulfilled" ? (companiesRes.value.data ?? [])    : []
+  const catalysts    = catalystsRes.status    === "fulfilled" ? (catalystsRes.value.data ?? [])    : []
+  const lastRun      = runRes.status          === "fulfilled" ? runRes.value.data                  : null
+  const lastNewsFetch = lastNewsRes.status    === "fulfilled" ? lastNewsRes.value.data?.fetched_at : null
+  const lastAnalysis  = lastAnalysisRes.status === "fulfilled" ? lastAnalysisRes.value.data?.generated_at : null
+
+  function timeAgo(ts: string | null): string {
+    if (!ts) return "—"
+    const diff = Date.now() - new Date(ts).getTime()
+    const h = Math.floor(diff / 3600000)
+    const m = Math.floor((diff % 3600000) / 60000)
+    if (h >= 24) return `${Math.floor(h / 24)}d geleden`
+    if (h > 0)   return `${h}u geleden`
+    return `${m}m geleden`
+  }
+
+  function freshnessColor(ts: string | null, warnAfterHours: number): string {
+    if (!ts) return "bg-zinc-600"
+    const h = (Date.now() - new Date(ts).getTime()) / 3600000
+    if (h < warnAfterHours * 0.5) return "bg-emerald-400"
+    if (h < warnAfterHours)       return "bg-amber-400"
+    return "bg-red-400"
+  }
 
   const topOpportunities = companies.slice(0, 6)
   const avgScore = companies.length > 0
@@ -98,6 +130,21 @@ export default async function DashboardPage() {
             Alle bedrijven
           </Button>
         </Link>
+      </div>
+
+      {/* Data versheid */}
+      <div className="flex flex-wrap gap-3 text-xs">
+        {[
+          { label: "Analyses",  ts: lastAnalysis,  warn: 26 },
+          { label: "Nieuws",    ts: lastNewsFetch, warn: 26 },
+          { label: "Pipeline",  ts: lastRun?.finished_at ?? null, warn: 26 },
+        ].map(({ label, ts, warn }) => (
+          <div key={label} className="flex items-center gap-1.5 rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1">
+            <span className={`h-1.5 w-1.5 rounded-full ${freshnessColor(ts, warn)}`} />
+            <span className="text-zinc-500">{label}:</span>
+            <span className="text-zinc-300 font-medium">{timeAgo(ts)}</span>
+          </div>
+        ))}
       </div>
 
       {/* Pipeline nog niet gedraaid */}
