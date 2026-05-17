@@ -236,10 +236,11 @@ async function saveNews(companyId: string, ticker: string, news: NewsArticle[]) 
   )
 }
 
-async function saveAnalysis(companyId: string, analysis: Awaited<ReturnType<typeof analyze>>) {
+async function saveAnalysis(companyId: string, analysis: Awaited<ReturnType<typeof analyze>>, entryPrice?: number) {
   await supabase.from("ai_analyses").insert({
     company_id: companyId,
     model: "claude-opus-4-7",
+    entry_price: entryPrice ?? null,
     score_total:          analysis.asymmetricScore.total,
     score_revenue_growth: analysis.asymmetricScore.revenueGrowth,
     score_cash_runway:    analysis.asymmetricScore.cashRunway,
@@ -349,7 +350,7 @@ async function main() {
       await saveNews(companyId, ticker, news)
       const financials = profile.cik ? await getFinancialSnapshot(profile.cik).catch(() => null) : null
       const analysis   = await analyze(ticker, profile, news, financials)
-      await saveAnalysis(companyId, analysis)
+      await saveAnalysis(companyId, analysis, profile.price)
 
       console.log(` score ${analysis.asymmetricScore.total}/100  [${analysis.riskLevel}]`)
       done++

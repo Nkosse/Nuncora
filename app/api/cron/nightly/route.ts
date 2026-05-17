@@ -199,6 +199,7 @@ async function pipeline(triggeredBy: string, skipDiscovery = false, batchSize = 
         await supabaseAdmin.from("ai_analyses").insert({
           company_id: companyId,
           model: "claude-opus-4-7",
+          entry_price: profile.price,
           score_total: analysis.asymmetricScore.total,
           score_revenue_growth: analysis.asymmetricScore.revenueGrowth,
           score_cash_runway: analysis.asymmetricScore.cashRunway,

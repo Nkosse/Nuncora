@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { FinancialTab } from "./financial-tab"
 import { PriceChart } from "./price-chart"
+import { PrognoseTracker } from "./prognose-tracker"
 
 export const revalidate = 300
 
@@ -180,6 +181,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               <p className="text-sm text-zinc-500">Analyse nog niet beschikbaar — pipeline draait nog.</p>
             </div>
           ) : (
+            <>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               <div className="lg:col-span-2 space-y-5">
                 {/* Samenvatting */}
@@ -280,6 +282,16 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                 </div>
               </div>
             </div>
+
+            <PrognoseTracker
+              entryPrice={analysis.entry_price ?? null}
+              currentPrice={company.price ?? null}
+              targetBear={analysis.price_target_bear ?? null}
+              targetBase={analysis.price_target_base ?? null}
+              targetBull={analysis.price_target_bull ?? null}
+              analysisDate={analysis.generated_at}
+            />
+            </>
           )}
         </TabsContent>
 
