@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk"
 import type { NewsArticle } from "@/lib/news/client"
-import { type FinancialSnapshot, formatFinancialsForPrompt } from "@/lib/sec/client"
+import { type FinancialSnapshot, formatFinancialsForPrompt, type InsiderActivity, formatInsiderForPrompt } from "@/lib/sec/client"
 
 export const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -20,6 +20,7 @@ export interface CompanyAnalysis {
     dilutionRisk: number
     sectorTailwind: number
     valuationDiscount: number
+    insiderOwnership: number
   }
   riskLevel: "low" | "medium" | "high" | "very-high"
   bullCase: string
@@ -58,7 +59,8 @@ export async function analyzeCompany(
     beta: number
   },
   news: NewsArticle[] = [],
-  financials: FinancialSnapshot | null = null
+  financials: FinancialSnapshot | null = null,
+  insiderActivity: InsiderActivity | null = null
 ): Promise<CompanyAnalysis> {
   const today = new Date().toISOString().split("T")[0]
 
@@ -70,6 +72,10 @@ export async function analyzeCompany(
   const financialsSection = financials
     ? `\n${formatFinancialsForPrompt(financials)}\n`
     : "\n(Geen SEC-financiële data beschikbaar — gebruik trainingskennis voor financiële inschatting.)\n"
+
+  const insiderSection = insiderActivity
+    ? `\n${formatInsiderForPrompt(insiderActivity)}\n`
+    : "\n(Geen Form 4 data beschikbaar — gebruik trainingskennis voor insider ownership inschatting.)\n"
 
   // Bereken P/S ratio als we revenue hebben
   const psRatio = financials?.revenueAnnual && financials.revenueAnnual > 0
@@ -94,16 +100,18 @@ Analyseer ${ticker} (${profile.name}) grondig op asymmetrisch opwaarts potentiee
 === BEDRIJFSBESCHRIJVING ===
 ${profile.description}
 ${financialsSection}
+${insiderSection}
 ${newsSection}
 
 === INSTRUCTIES ===
-Gebruik de bovenstaande OFFICIËLE SEC-KERNCIJFERS als primaire bron voor financiële scores (revenueGrowth, cashRunway, dilutionRisk). Combineer dit met je trainingskennis over dit bedrijf voor kwalitatieve factoren (technologie, concurrenten, management, catalysts).
+Gebruik de bovenstaande OFFICIËLE SEC-KERNCIJFERS als primaire bron voor financiële scores. Gebruik de Form 4 data voor insiderOwnership score. Combineer met trainingskennis voor kwalitatieve factoren.
 
 Let speciaal op:
-- cashRunway: gebruik de berekende maanden cash runway als die beschikbaar is; < 12 maanden = score ≤ 3, 12-24 mnd = 4-6, > 24 mnd of FCF positief = 7-10
-- revenueGrowth: baseer op de werkelijke YoY groeicijfers uit SEC data
-- dilutionRisk: verhoog dit risico als de schuld hoog is of cash runway kort
-- valuationDiscount: gebruik de P/S ratio t.o.v. sectorgenoten
+- cashRunway: gebruik berekende maanden; < 12 mnd = ≤ 3, 12-24 mnd = 4-6, > 24 mnd of FCF positief = 7-10
+- revenueGrowth: baseer op werkelijke YoY% uit SEC data
+- dilutionRisk: verhoog als schuld hoog of cash runway kort
+- valuationDiscount: gebruik P/S ratio t.o.v. sectorgenoten
+- insiderOwnership: actief inkopen = 8-10, stabiel/geen activiteit = 5-7, zware verkopen = 2-4; gebruik ook trainingskennis over het totale ownership %
 
 Geef een grondige, genuanceerde analyse. Wees specifiek — noem producten, contracten, klanten, concurrenten bij naam. Vermijd generieke uitspraken.
 
@@ -121,7 +129,8 @@ Retourneer UITSLUITEND een geldig JSON object (geen markdown, geen uitleg):
     "shortInterest": <0-10, hoog short interest = squeeze potentieel = hogere score>,
     "dilutionRisk": <0-10, laag dilutierisico = hogere score>,
     "sectorTailwind": <0-10>,
-    "valuationDiscount": <0-10>
+    "valuationDiscount": <0-10>,
+    "insiderOwnership": <0-10, actief inkopen/hoog % = hogere score>
   },
   "riskLevel": "<low|medium|high|very-high>",
   "bullCase": "2-3 zinnen bull scenario met specifieke drivers",

@@ -40,16 +40,17 @@ function fmtMCap(v: number) {
 }
 
 const SUB_SCORE_LABELS: Record<string, string> = {
-  score_revenue_growth:  "Revenue Growth",
-  score_cash_runway:     "Cash Runway",
-  score_tam_size:        "TAM Size",
-  score_competitive_adv: "Competitive Advantage",
-  score_management:      "Management Quality",
-  score_catalyst_density:"Catalyst Density",
-  score_short_interest:  "Short Interest Squeeze",
-  score_dilution_risk:   "Dilution Risk (laag = goed)",
-  score_sector_tailwind: "Sector Tailwind",
-  score_valuation:       "Valuation Discount",
+  score_revenue_growth:     "Revenue Growth",
+  score_cash_runway:        "Cash Runway",
+  score_tam_size:           "TAM Size",
+  score_competitive_adv:    "Competitive Advantage",
+  score_management:         "Management Quality",
+  score_catalyst_density:   "Catalyst Density",
+  score_short_interest:     "Short Interest Squeeze",
+  score_dilution_risk:      "Dilution Risk (laag = goed)",
+  score_sector_tailwind:    "Sector Tailwind",
+  score_valuation:          "Valuation Discount",
+  score_insider_ownership:  "Insider Ownership & Activiteit",
 }
 
 export default async function CompanyDetailPage({ params }: { params: Promise<{ slug: string }> }) {

@@ -4,7 +4,7 @@ import { getCompanyProfile } from "@/lib/fmp/client"
 import { analyzeCompany } from "@/lib/anthropic/client"
 import { fetchNewsForTicker } from "@/lib/news/client"
 import { discoverCandidates, validateAndFilterTickers } from "@/lib/discovery/client"
-import { getFinancialSnapshot } from "@/lib/sec/client"
+import { getFinancialSnapshot, getInsiderActivity } from "@/lib/sec/client"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
@@ -177,8 +177,9 @@ async function pipeline(triggeredBy: string, skipDiscovery = false, batchSize = 
           newsFetched += newArticles.length
         }
 
-        // SEC financiële kerncijfers ophalen (gratis, geen API-key)
-        const financials = profile.cik ? await getFinancialSnapshot(profile.cik).catch(() => null) : null
+        // SEC data ophalen (financials + insider activiteit)
+        const financials      = profile.cik ? await getFinancialSnapshot(profile.cik).catch(() => null) : null
+        const insiderActivity = profile.cik ? await getInsiderActivity(profile.cik).catch(() => null) : null
 
         // Claude deep analysis
         const analysis = await analyzeCompany(ticker, {
@@ -193,7 +194,7 @@ async function pipeline(triggeredBy: string, skipDiscovery = false, batchSize = 
           exchange: profile.exchange ?? "",
           ipoDate: profile.ipoDate ?? "",
           beta: profile.beta ?? 0,
-        }, news, financials)
+        }, news, financials, insiderActivity)
 
         // Analyse opslaan
         await supabaseAdmin.from("ai_analyses").insert({
@@ -211,6 +212,7 @@ async function pipeline(triggeredBy: string, skipDiscovery = false, batchSize = 
           score_dilution_risk: analysis.asymmetricScore.dilutionRisk,
           score_sector_tailwind: analysis.asymmetricScore.sectorTailwind,
           score_valuation: analysis.asymmetricScore.valuationDiscount,
+          score_insider_ownership: analysis.asymmetricScore.insiderOwnership,
           risk_level: analysis.riskLevel,
           summary: analysis.summary,
           thesis: analysis.thesis,

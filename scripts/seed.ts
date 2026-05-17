@@ -14,7 +14,7 @@ config({ path: resolve(process.cwd(), ".env.local") })
 
 import { createClient } from "@supabase/supabase-js"
 import Anthropic from "@anthropic-ai/sdk"
-import { getFinancialSnapshot, formatFinancialsForPrompt } from "../lib/sec/client"
+import { getFinancialSnapshot, formatFinancialsForPrompt, getInsiderActivity, formatInsiderForPrompt } from "../lib/sec/client"
 
 // ── Clients ────────────────────────────────────────────────────────────────
 
@@ -128,7 +128,13 @@ async function discover(): Promise<{ ticker: string; rationale: string }[]> {
 
 // ── Claude analysis ────────────────────────────────────────────────────────
 
-async function analyze(ticker: string, profile: FMPProfile, news: NewsArticle[], financials: Awaited<ReturnType<typeof getFinancialSnapshot>>) {
+async function analyze(
+  ticker: string,
+  profile: FMPProfile,
+  news: NewsArticle[],
+  financials: Awaited<ReturnType<typeof getFinancialSnapshot>>,
+  insiderActivity: Awaited<ReturnType<typeof getInsiderActivity>>
+) {
   const today    = new Date().toISOString().split("T")[0]
   const newsText = news.length > 0
     ? "\nRecent nieuws:\n" + news.map((n, i) => `${i+1}. [${n.source}] ${n.title}\n   ${n.summary}`).join("\n")
@@ -137,6 +143,10 @@ async function analyze(ticker: string, profile: FMPProfile, news: NewsArticle[],
   const financialsText = financials
     ? "\n" + formatFinancialsForPrompt(financials) + "\n"
     : "\n(Geen SEC-financiële data beschikbaar — gebruik trainingskennis.)\n"
+
+  const insiderText = insiderActivity
+    ? "\n" + formatInsiderForPrompt(insiderActivity) + "\n"
+    : "\n(Geen Form 4 data beschikbaar — gebruik trainingskennis voor insider ownership inschatting.)\n"
 
   const psRatio = financials?.revenueAnnual && financials.revenueAnnual > 0
     ? (profile.marketCap / financials.revenueAnnual).toFixed(1)
@@ -158,16 +168,18 @@ Medewerkers: ${profile.fullTimeEmployees} | Beurs: ${profile.exchange} | IPO: ${
 === BESCHRIJVING ===
 ${profile.description}
 ${financialsText}
+${insiderText}
 ${newsText}
 
 === INSTRUCTIES ===
-Gebruik de SEC-KERNCIJFERS hierboven als primaire bron voor financiële scores. Combineer met trainingskennis voor kwalitatieve factoren.
+Gebruik de SEC-KERNCIJFERS als primaire bron voor financiële scores. Gebruik Form 4 data voor insiderOwnership. Combineer met trainingskennis voor kwalitatieve factoren.
 
 Let speciaal op:
-- cashRunway: gebruik berekende maanden; < 12 mnd = score ≤ 3, 12-24 mnd = 4-6, > 24 mnd of FCF positief = 7-10
+- cashRunway: gebruik berekende maanden; < 12 mnd = ≤ 3, 12-24 mnd = 4-6, > 24 mnd of FCF positief = 7-10
 - revenueGrowth: baseer op werkelijke YoY% uit SEC data
 - dilutionRisk: verhoog als schuld hoog of cash runway kort
 - valuationDiscount: gebruik P/S ratio t.o.v. sectorgenoten
+- insiderOwnership: actief inkopen = 8-10, stabiel = 5-7, zware verkopen = 2-4
 
 Wees specifiek — noem producten, contracten, klanten bij naam.
 
@@ -179,7 +191,8 @@ Retourneer UITSLUITEND geldig JSON:
     "revenueGrowth": <0-10>, "cashRunway": <0-10>, "tamSize": <0-10>,
     "competitiveAdvantage": <0-10>, "managementQuality": <0-10>,
     "catalystDensity": <0-10>, "shortInterest": <0-10>,
-    "dilutionRisk": <0-10>, "sectorTailwind": <0-10>, "valuationDiscount": <0-10>
+    "dilutionRisk": <0-10>, "sectorTailwind": <0-10>, "valuationDiscount": <0-10>,
+    "insiderOwnership": <0-10>
   },
   "riskLevel": "<low|medium|high|very-high>",
   "bullCase": "2-3 zinnen",
@@ -249,9 +262,10 @@ async function saveAnalysis(companyId: string, analysis: Awaited<ReturnType<type
     score_management:     analysis.asymmetricScore.managementQuality,
     score_catalysts:      analysis.asymmetricScore.catalystDensity,
     score_short_interest: analysis.asymmetricScore.shortInterest,
-    score_dilution_risk:  analysis.asymmetricScore.dilutionRisk,
-    score_sector_tailwind:analysis.asymmetricScore.sectorTailwind,
-    score_valuation:      analysis.asymmetricScore.valuationDiscount,
+    score_dilution_risk:      analysis.asymmetricScore.dilutionRisk,
+    score_sector_tailwind:    analysis.asymmetricScore.sectorTailwind,
+    score_valuation:          analysis.asymmetricScore.valuationDiscount,
+    score_insider_ownership:  analysis.asymmetricScore.insiderOwnership,
     risk_level: analysis.riskLevel,
     summary:    analysis.summary,
     thesis:     analysis.thesis,
@@ -348,8 +362,9 @@ async function main() {
       const companyId  = await saveCompany(profile)
       const news       = await fetchNews(ticker, profile.companyName)
       await saveNews(companyId, ticker, news)
-      const financials = profile.cik ? await getFinancialSnapshot(profile.cik).catch(() => null) : null
-      const analysis   = await analyze(ticker, profile, news, financials)
+      const financials      = profile.cik ? await getFinancialSnapshot(profile.cik).catch(() => null) : null
+      const insiderActivity = profile.cik ? await getInsiderActivity(profile.cik).catch(() => null) : null
+      const analysis        = await analyze(ticker, profile, news, financials, insiderActivity)
       await saveAnalysis(companyId, analysis, profile.price)
 
       console.log(` score ${analysis.asymmetricScore.total}/100  [${analysis.riskLevel}]`)
