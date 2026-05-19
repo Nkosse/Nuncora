@@ -28,6 +28,20 @@ function riskColor(level: string) {
   return "text-emerald-400"
 }
 
+const IMPACT_ORDER: Record<string, number> = { Critical: 0, High: 1, Medium: 2, Low: 3 }
+
+function periodSortKey(period: string | null): number {
+  if (!period) return 999_999
+  const p = period.trim().toUpperCase()
+  const q = /^Q([1-4])\s+(\d{4})$/.exec(p)
+  if (q) return parseInt(q[2]) * 10 + parseInt(q[1])
+  const h = /^H([12])\s+(\d{4})$/.exec(p)
+  if (h) return parseInt(h[2]) * 10 + (h[1] === "1" ? 2.5 : 3.5)
+  const y = /^(\d{4})$/.exec(p)
+  if (y) return parseInt(y[1]) * 10 + 5
+  return 888_888
+}
+
 export default async function DashboardPage() {
   // Data ophalen uit Supabase
   const [companiesRes, catalystsRes, runRes, lastNewsRes, lastAnalysisRes] = await Promise.allSettled([
@@ -39,7 +53,7 @@ export default async function DashboardPage() {
     supabaseAdmin
       .from("upcoming_catalysts")
       .select("*")
-      .limit(6),
+      .limit(50),
     supabaseAdmin
       .from("pipeline_runs")
       .select("finished_at, status, companies_updated, analyses_run")
@@ -62,7 +76,13 @@ export default async function DashboardPage() {
   ])
 
   const companies    = companiesRes.status    === "fulfilled" ? (companiesRes.value.data ?? [])    : []
-  const catalysts    = catalystsRes.status    === "fulfilled" ? (catalystsRes.value.data ?? [])    : []
+  const allCatalysts = catalystsRes.status    === "fulfilled" ? (catalystsRes.value.data ?? [])    : []
+  const catalysts    = [...allCatalysts]
+    .sort((a, b) => {
+      const pk = periodSortKey(a.estimated_period) - periodSortKey(b.estimated_period)
+      return pk !== 0 ? pk : (IMPACT_ORDER[a.impact_level] ?? 4) - (IMPACT_ORDER[b.impact_level] ?? 4)
+    })
+    .slice(0, 6)
   const lastRun      = runRes.status          === "fulfilled" ? runRes.value.data                  : null
   const lastNewsFetch = lastNewsRes.status    === "fulfilled" ? lastNewsRes.value.data?.fetched_at : null
   const lastAnalysis  = lastAnalysisRes.status === "fulfilled" ? lastAnalysisRes.value.data?.generated_at : null
@@ -162,7 +182,7 @@ export default async function DashboardPage() {
           {[
             { label: "Bedrijven gevolgd",    value: companies.length.toString(),       sub: "Actief gevolgd",             icon: Building2,     color: "text-indigo-400" },
             { label: "Gem. Upside Score",    value: `${avgScore}/100`,                 sub: "Over alle bedrijven",        icon: TrendingUp,    color: "text-emerald-400" },
-            { label: "Komende catalysts",    value: catalysts.length.toString(),       sub: "Geïdentificeerd",            icon: Calendar,      color: "text-amber-400" },
+            { label: "Komende catalysts",    value: allCatalysts.length.toString(),    sub: "Geïdentificeerd",            icon: Calendar,      color: "text-amber-400" },
             { label: "Hoog risico",          value: highRisk.length.toString(),        sub: "Vereisen aandacht",          icon: AlertTriangle, color: "text-red-400" },
           ].map((stat) => {
             const Icon = stat.icon
