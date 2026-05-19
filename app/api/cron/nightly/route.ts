@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/supabase/admin"
-import { getCompanyProfile, batchGetPrices } from "@/lib/fmp/client"
+import { getCompanyProfile, getMultipleProfiles } from "@/lib/fmp/client"
 import { analyzeCompany } from "@/lib/anthropic/client"
 import { fetchNewsForTicker } from "@/lib/news/client"
 import { discoverCandidates, validateAndFilterTickers } from "@/lib/discovery/client"
@@ -59,21 +59,20 @@ async function pipeline(triggeredBy: string, skipDiscovery = false, batchSize = 
     log.push(`Bestaande bedrijven: ${existingTickers.length}`)
 
     if (existingTickers.length > 0) {
-      const quotes = await batchGetPrices(existingTickers)
-      if (quotes.length > 0) {
+      const profiles = await getMultipleProfiles(existingTickers)
+      if (profiles.length > 0) {
         await supabaseAdmin.from("companies").upsert(
-          quotes.map((q) => ({
-            id: q.symbol.toLowerCase(),
-            ticker: q.symbol,
-            price: q.price,
-            market_cap: q.marketCap,
-            price_change_pct: q.changesPercentage,
+          profiles.map((p) => ({
+            id: p.symbol.toLowerCase(),
+            ticker: p.symbol,
+            price: p.price,
+            market_cap: p.marketCap,
             last_updated: new Date().toISOString(),
           })),
           { onConflict: "id" }
         )
-        pricesRefreshed = quotes.length
-        log.push(`Prijzen bijgewerkt voor ${quotes.length} bedrijven`)
+        pricesRefreshed = profiles.length
+        log.push(`Prijzen bijgewerkt voor ${profiles.length} bedrijven`)
       }
     }
 
