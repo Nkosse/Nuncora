@@ -59,20 +59,34 @@ async function pipeline(triggeredBy: string, skipDiscovery = false, batchSize = 
     log.push(`Bestaande bedrijven: ${existingTickers.length}`)
 
     if (existingTickers.length > 0) {
-      const profiles = await getMultipleProfiles(existingTickers)
-      if (profiles.length > 0) {
+      log.push(`Prijs-refresh gestart voor ${existingTickers.length} tickers...`)
+      // Chunk in groepen van 10 om FMP rate limit te vermijden
+      const CHUNK = 10
+      const allProfiles: Awaited<ReturnType<typeof getCompanyProfile>>[] = []
+      for (let i = 0; i < existingTickers.length; i += CHUNK) {
+        const chunk = existingTickers.slice(i, i + CHUNK)
+        const results = await Promise.allSettled(chunk.map((t) => getCompanyProfile(t)))
+        for (const r of results) {
+          if (r.status === "fulfilled" && r.value !== null) allProfiles.push(r.value)
+        }
+        if (i + CHUNK < existingTickers.length) {
+          await new Promise((res) => setTimeout(res, 300))
+        }
+      }
+      log.push(`FMP teruggegeven: ${allProfiles.length} profielen`)
+      if (allProfiles.length > 0) {
         await supabaseAdmin.from("companies").upsert(
-          profiles.map((p) => ({
-            id: p.symbol.toLowerCase(),
-            ticker: p.symbol,
-            price: p.price,
-            market_cap: p.marketCap,
+          allProfiles.map((p) => ({
+            id: p!.symbol.toLowerCase(),
+            ticker: p!.symbol,
+            price: p!.price,
+            market_cap: p!.marketCap,
             last_updated: new Date().toISOString(),
           })),
           { onConflict: "id" }
         )
-        pricesRefreshed = profiles.length
-        log.push(`Prijzen bijgewerkt voor ${profiles.length} bedrijven`)
+        pricesRefreshed = allProfiles.length
+        log.push(`Prijzen bijgewerkt voor ${allProfiles.length} bedrijven`)
       }
     }
 
