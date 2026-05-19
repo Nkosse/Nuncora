@@ -45,12 +45,81 @@ const SUB_SCORE_LABELS: Record<string, string> = {
   score_tam_size:           "TAM Size",
   score_competitive_adv:    "Competitive Advantage",
   score_management:         "Management Quality",
-  score_catalyst_density:   "Catalyst Density",
+  score_catalysts:          "Catalyst Density",
   score_short_interest:     "Short Interest Squeeze",
   score_dilution_risk:      "Dilution Risk (laag = goed)",
   score_sector_tailwind:    "Sector Tailwind",
   score_valuation:          "Valuation Discount",
   score_insider_ownership:  "Insider Ownership & Activiteit",
+}
+
+const SUB_SCORE_INFO: Record<string, { desc: string; high: string; mid: string; low: string }> = {
+  score_revenue_growth: {
+    desc: "Jaarlijkse omzetgroei op basis van SEC EDGAR-data.",
+    high: "Sterke groei — het bedrijf schaalt snel en wint marktaandeel.",
+    mid:  "Gematigde groei — de markt wordt geleidelijk veroverd.",
+    low:  "Trage of negatieve groei — groeikatalysatoren ontbreken voorlopig.",
+  },
+  score_cash_runway: {
+    desc: "Hoe lang het bedrijf kan doordraaien zonder extra financiering.",
+    high: "Lange cashbaan (>24 mnd) of al FCF-positief — geen acuut financieringsrisico.",
+    mid:  "12–24 maanden cash — aandachtspunt, maar geen directe nood.",
+    low:  "Minder dan 12 maanden cash — bijuitgifte of financieringsnood dreigt op korte termijn.",
+  },
+  score_tam_size: {
+    desc: "Omvang van de totale adresseerbare markt (TAM).",
+    high: "Enorme markt — zelfs een klein marktaandeel vertegenwoordigt miljarden aan omzet.",
+    mid:  "Aantrekkelijke markt van substantiële omvang met ruimte voor meerdere winnaars.",
+    low:  "Nichemarkt — het groeipotentieel is structureel beperkt.",
+  },
+  score_competitive_adv: {
+    desc: "Duurzaam concurrentievoordeel via IP, netwerk, switching costs of schaalvoordelen.",
+    high: "Sterk moat — het aanbod is lastig te repliceren door concurrenten.",
+    mid:  "Enige differentiatie aanwezig, maar concurrentiedruk is voelbaar.",
+    low:  "Weinig bescherming — commoditisatierisico drukt op lange-termijn marges.",
+  },
+  score_management: {
+    desc: "Track record, visie en executievermogen van het leiderschapsteam.",
+    high: "Bewezen leiders met een solide staat van dienst en heldere strategie.",
+    mid:  "Competent maar nog niet volledig bewezen op dit schaalniveau.",
+    low:  "Zwak of wisselend management — executierisico is een reële zorg.",
+  },
+  score_catalysts: {
+    desc: "Aantal en kwaliteit van concrete aankomende groeikatalysatoren.",
+    high: "Meerdere concrete catalysts op korte termijn — koersdruk kan snel omslaan.",
+    mid:  "Enkele katalysatoren in het verschiet, tijdlijn is onzeker.",
+    low:  "Weinig zichtbare triggers — de koers blijft waarschijnlijk vlak zonder verrassing.",
+  },
+  score_short_interest: {
+    desc: "Hoog short interest creëert squeeze-potentieel bij positief nieuws.",
+    high: "Hoog short interest — goed nieuws kan een explosieve short squeeze veroorzaken.",
+    mid:  "Gemiddeld short interest — beperkt squeeze-potentieel als extra brandstof.",
+    low:  "Laag short interest — weinig extra opwaartse kracht vanuit gedekte shorts.",
+  },
+  score_dilution_risk: {
+    desc: "Risico op aandelenverwatering via bijuitgifte of convertibles (hoge score = laag risico).",
+    high: "Laag verwateringsrisico — de kapitaalstructuur is gezond.",
+    mid:  "Enige kans op bijuitgifte, maar niet acuut dreigend.",
+    low:  "Hoog verwateringsrisico — bestaande aandeelhouders lopen kans op significante verwatering.",
+  },
+  score_sector_tailwind: {
+    desc: "Mate waarin macrotrends en beleid de sector structureel ondersteunen.",
+    high: "Krachtige structurele tailwind — de sector groeit hard en trekt kapitaal aan.",
+    mid:  "Positieve trend aanwezig, maar geen explosieve sectorgroei verwacht.",
+    low:  "Beperkte sectorsteun — tegenwind of stagnatie kan de waardering drukken.",
+  },
+  score_valuation: {
+    desc: "Hoe aantrekkelijk de waardering is t.o.v. sectorgenoten (P/S, EV/Revenue).",
+    high: "Significant undervalued vs peers — grote veiligheidsmarge en re-rating-potentieel.",
+    mid:  "Redelijk gewaardeerd — discount is beperkt maar aanwezig.",
+    low:  "Geprijsd voor perfectie — weinig ruimte voor teleurstellingen in de executie.",
+  },
+  score_insider_ownership: {
+    desc: "Insider activiteit op basis van SEC Form 4 filings (aankopen vs verkopen).",
+    high: "Insiders kopen actief bij eigen aandelen — sterk signaal van intern vertrouwen.",
+    mid:  "Stabiel insider ownership — geen alarmsignalen, maar ook geen actieve aankopen.",
+    low:  "Zware insider verkopen gedetecteerd — bearish signaal vanuit het management zelf.",
+  },
 }
 
 export default async function CompanyDetailPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -347,24 +416,80 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               </div>
 
               {/* Sub-scores */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {Object.entries(SUB_SCORE_LABELS).map(([key, label]) => {
                   const val = analysis[key as keyof typeof analysis] as number ?? 0
                   const pct = (val / 10) * 100
                   const color = pct >= 70 ? "bg-emerald-500" : pct >= 50 ? "bg-blue-500" : pct >= 30 ? "bg-amber-500" : "bg-red-500"
+                  const info = SUB_SCORE_INFO[key]
+                  const interp = info ? (val >= 7 ? info.high : val >= 4 ? info.mid : info.low) : null
                   return (
-                    <div key={key}>
+                    <div key={key} className="space-y-1">
                       <div className="flex justify-between text-xs mb-1">
-                        <span className="text-zinc-500">{label}</span>
+                        <span className="text-zinc-400 font-medium">{label}</span>
                         <span className={cn("font-bold", scoreColor(pct))}>{val}/10</span>
                       </div>
                       <div className="h-1.5 rounded-full bg-zinc-800">
                         <div className={cn("h-full rounded-full transition-all", color)} style={{ width: `${pct}%` }} />
                       </div>
+                      {info && (
+                        <p className="text-xs text-zinc-600 leading-snug pt-0.5">
+                          <span className="text-zinc-700">{info.desc}</span>{" "}
+                          <span className={val >= 7 ? "text-emerald-600" : val >= 4 ? "text-amber-600" : "text-red-600"}>{interp}</span>
+                        </p>
+                      )}
                     </div>
                   )
                 })}
               </div>
+
+              {/* Samenvatting sterkste / zwakste factoren */}
+              {(() => {
+                const scored = Object.entries(SUB_SCORE_LABELS)
+                  .map(([key, label]) => ({ key, label, val: (analysis[key as keyof typeof analysis] as number) ?? 0 }))
+                  .filter(f => f.val > 0)
+                  .sort((a, b) => b.val - a.val)
+                const top    = scored.slice(0, 3)
+                const bottom = scored.slice(-2).reverse()
+                return (
+                  <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4 space-y-3">
+                    <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Wat betekent dit voor het aandeel?</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <p className="text-emerald-500 font-medium mb-1.5">Sterke punten</p>
+                        <ul className="space-y-1">
+                          {top.map(f => (
+                            <li key={f.key} className="flex items-start gap-1.5 text-zinc-400">
+                              <span className="text-emerald-500 shrink-0">✓</span>
+                              <span><span className="text-zinc-300">{f.label}</span> ({f.val}/10) — {SUB_SCORE_INFO[f.key]?.high ?? ""}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <p className="text-red-500 font-medium mb-1.5">Aandachtspunten</p>
+                        <ul className="space-y-1">
+                          {bottom.map(f => (
+                            <li key={f.key} className="flex items-start gap-1.5 text-zinc-400">
+                              <span className="text-red-500 shrink-0">!</span>
+                              <span><span className="text-zinc-300">{f.label}</span> ({f.val}/10) — {SUB_SCORE_INFO[f.key]?.low ?? ""}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                    <p className="text-xs text-zinc-600 pt-1 border-t border-zinc-800">
+                      {analysis.score_total >= 75
+                        ? "Sterke asymmetrische kans — meerdere factoren wijzen op significant opwaarts potentieel."
+                        : analysis.score_total >= 60
+                        ? "Interessante kans met duidelijke risico's — selectieve positionering is verstandig."
+                        : analysis.score_total >= 45
+                        ? "Speculatieve thesis — hoge onzekerheid vereist strikte positiegrootte."
+                        : "Hoog risicoprofiel — alleen geschikt voor kleine speculatieve posities."}
+                    </p>
+                  </div>
+                )
+              })()}
             </div>
           )}
         </TabsContent>
