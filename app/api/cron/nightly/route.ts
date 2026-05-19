@@ -38,6 +38,7 @@ async function pipeline(triggeredBy: string, skipDiscovery = false, batchSize = 
   let companiesUpdated = 0
   let newsFetched = 0
   let analysesRun = 0
+  let pricesRefreshed = 0
 
   // Log pipeline start in Supabase
   const { data: runRow } = await supabaseAdmin
@@ -71,6 +72,7 @@ async function pipeline(triggeredBy: string, skipDiscovery = false, batchSize = 
           })),
           { onConflict: "id" }
         )
+        pricesRefreshed = quotes.length
         log.push(`Prijzen bijgewerkt voor ${quotes.length} bedrijven`)
       }
     }
@@ -284,6 +286,7 @@ async function pipeline(triggeredBy: string, skipDiscovery = false, batchSize = 
       companies_new: companiesNew,
       news_fetched: newsFetched,
       analyses_run: analysesRun,
+      prices_refreshed: pricesRefreshed,
       errors,
     }).eq("id", runId)
 
@@ -294,6 +297,7 @@ async function pipeline(triggeredBy: string, skipDiscovery = false, batchSize = 
       companiesUpdated,
       newsFetched,
       analysesRun,
+      pricesRefreshed,
       log,
       errors: errors.slice(0, 10),
     })

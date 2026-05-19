@@ -62,10 +62,10 @@ export default async function AIResearchPage() {
         {lastRun && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label: "Gevonden",    value: lastRun.companies_found ?? 0,   color: "text-zinc-300" },
-              { label: "Bijgewerkt",  value: lastRun.companies_updated ?? 0, color: "text-blue-400" },
-              { label: "Nieuw",       value: lastRun.companies_new ?? 0,     color: "text-emerald-400" },
-              { label: "Analyses",    value: lastRun.analyses_run ?? 0,      color: "text-indigo-400" },
+              { label: "Gevonden",         value: lastRun.companies_found ?? 0,    color: "text-zinc-300" },
+              { label: "Prijzen ververst", value: lastRun.prices_refreshed ?? 0,  color: "text-emerald-400" },
+              { label: "Analyses",         value: lastRun.analyses_run ?? 0,       color: "text-indigo-400" },
+              { label: "Fouten",           value: (lastRun.errors ?? []).length,   color: (lastRun.errors ?? []).length > 0 ? "text-red-400" : "text-zinc-600" },
             ].map((s) => (
               <div key={s.label} className="rounded-lg border border-zinc-800 bg-zinc-950/50 p-3 text-center">
                 <p className={cn("text-xl font-bold tabular-nums", s.color)}>{s.value}</p>
