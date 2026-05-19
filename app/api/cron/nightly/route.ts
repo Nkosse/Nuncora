@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/supabase/admin"
-import { getCompanyProfile } from "@/lib/fmp/client"
+import { getCompanyProfile, batchGetPrices } from "@/lib/fmp/client"
 import { analyzeCompany } from "@/lib/anthropic/client"
 import { fetchNewsForTicker } from "@/lib/news/client"
 import { discoverCandidates, validateAndFilterTickers } from "@/lib/discovery/client"
@@ -48,14 +48,32 @@ async function pipeline(triggeredBy: string, skipDiscovery = false, batchSize = 
   const runId = runRow?.id
 
   try {
-    // ── Stap 1: Haal bestaande bedrijven op met hun laatste analyse ─
-    const { data: existing } = await supabaseAdmin
+    // ── Stap 0: Prijsupdate voor alle actieve bedrijven ────────────
+    const { data: allCompanies } = await supabaseAdmin
       .from("companies")
       .select("ticker, id")
       .eq("is_active", true)
 
-    const existingTickers = existing?.map((c) => c.ticker) ?? []
+    const existingTickers = allCompanies?.map((c) => c.ticker) ?? []
     log.push(`Bestaande bedrijven: ${existingTickers.length}`)
+
+    if (existingTickers.length > 0) {
+      const quotes = await batchGetPrices(existingTickers)
+      if (quotes.length > 0) {
+        await supabaseAdmin.from("companies").upsert(
+          quotes.map((q) => ({
+            id: q.symbol.toLowerCase(),
+            ticker: q.symbol,
+            price: q.price,
+            market_cap: q.marketCap,
+            price_change_pct: q.changesPercentage,
+            last_updated: new Date().toISOString(),
+          })),
+          { onConflict: "id" }
+        )
+        log.push(`Prijzen bijgewerkt voor ${quotes.length} bedrijven`)
+      }
+    }
 
     // ── Stap 2: Discovery — bij weinig bedrijven of elke zondag ────
     const isSunday = new Date().getUTCDay() === 0

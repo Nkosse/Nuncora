@@ -55,6 +55,30 @@ export async function getMultipleProfiles(tickers: string[]): Promise<FMPProfile
     .map((r) => r.value)
 }
 
+export interface FMPQuote {
+  symbol: string
+  price: number
+  changesPercentage: number
+  marketCap: number
+}
+
+// Haalt live koersen op voor meerdere tickers in één API-call
+export async function batchGetPrices(tickers: string[]): Promise<FMPQuote[]> {
+  if (tickers.length === 0) return []
+  try {
+    const data = await fmp("/quote", { symbol: tickers.join(",") })
+    if (!Array.isArray(data)) return []
+    return data.map((q: FMPQuote) => ({
+      symbol: q.symbol,
+      price: q.price,
+      changesPercentage: q.changesPercentage,
+      marketCap: q.marketCap,
+    }))
+  } catch {
+    return []
+  }
+}
+
 // Curated future-tech smallcap tickers
 export const SEED_TICKERS = [
   // Space
