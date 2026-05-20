@@ -75,25 +75,24 @@ async function pipeline(triggeredBy: string, skipDiscovery = false, batchSize = 
       }
       log.push(`FMP teruggegeven: ${allProfiles.length} profielen`)
       if (allProfiles.length > 0) {
-        const { error: upsertError } = await supabaseAdmin.from("companies").upsert(
-          allProfiles.map((p) => ({
-            id: p!.symbol.toLowerCase(),
-            slug: p!.symbol.toLowerCase(),
-            ticker: p!.symbol,
-            name: p!.companyName,
-            price: p!.price,
-            market_cap: p!.marketCap,
-            last_updated: new Date().toISOString(),
-          })),
-          { onConflict: "id" }
+        const now = new Date().toISOString()
+        const updateResults = await Promise.allSettled(
+          allProfiles.map((p) =>
+            supabaseAdmin
+              .from("companies")
+              .update({ price: p!.price, market_cap: p!.marketCap, last_updated: now })
+              .eq("id", p!.symbol.toLowerCase())
+          )
         )
-        if (upsertError) {
-          errors.push(`Prijs-upsert fout: ${upsertError.message}`)
-          log.push(`Prijs-upsert mislukt: ${upsertError.message}`)
-        } else {
-          pricesRefreshed = allProfiles.length
-          log.push(`Prijzen bijgewerkt voor ${allProfiles.length} bedrijven`)
+        const updateErrors = updateResults
+          .filter((r): r is PromiseFulfilledResult<{ error: { message: string } | null }> =>
+            r.status === "fulfilled" && r.value.error !== null)
+          .map((r) => r.value.error!.message)
+        if (updateErrors.length > 0) {
+          errors.push(`Prijsupdate fouten: ${updateErrors.slice(0, 3).join(", ")}`)
         }
+        pricesRefreshed = updateResults.filter((r) => r.status === "fulfilled" && !r.value.error).length
+        log.push(`Prijzen bijgewerkt voor ${pricesRefreshed} van ${allProfiles.length} bedrijven`)
       }
     }
 
