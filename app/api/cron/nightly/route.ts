@@ -75,18 +75,25 @@ async function pipeline(triggeredBy: string, skipDiscovery = false, batchSize = 
       }
       log.push(`FMP teruggegeven: ${allProfiles.length} profielen`)
       if (allProfiles.length > 0) {
-        await supabaseAdmin.from("companies").upsert(
+        const { error: upsertError } = await supabaseAdmin.from("companies").upsert(
           allProfiles.map((p) => ({
             id: p!.symbol.toLowerCase(),
+            slug: p!.symbol.toLowerCase(),
             ticker: p!.symbol,
+            name: p!.companyName,
             price: p!.price,
             market_cap: p!.marketCap,
             last_updated: new Date().toISOString(),
           })),
           { onConflict: "id" }
         )
-        pricesRefreshed = allProfiles.length
-        log.push(`Prijzen bijgewerkt voor ${allProfiles.length} bedrijven`)
+        if (upsertError) {
+          errors.push(`Prijs-upsert fout: ${upsertError.message}`)
+          log.push(`Prijs-upsert mislukt: ${upsertError.message}`)
+        } else {
+          pricesRefreshed = allProfiles.length
+          log.push(`Prijzen bijgewerkt voor ${allProfiles.length} bedrijven`)
+        }
       }
     }
 
