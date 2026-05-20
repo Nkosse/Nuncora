@@ -2,7 +2,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin"
 import { ScreenerClient } from "./screener-client"
 
 export const metadata = { title: "Screener" }
-export const revalidate = 300
+export const dynamic = "force-dynamic"
 
 export default async function ScreenerPage() {
   const { data } = await supabaseAdmin

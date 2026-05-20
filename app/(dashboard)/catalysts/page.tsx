@@ -4,7 +4,7 @@ import { Calendar, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export const metadata = { title: "Catalyst Timeline · Nuncora" }
-export const revalidate = 300
+export const dynamic = "force-dynamic"
 
 const IMPACT_ORDER: Record<string, number> = { Critical: 0, High: 1, Medium: 2, Low: 3 }
 

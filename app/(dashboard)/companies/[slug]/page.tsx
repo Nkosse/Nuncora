@@ -10,7 +10,7 @@ import { FinancialTab } from "./financial-tab"
 import { PriceChart } from "./price-chart"
 import { PrognoseTracker } from "./prognose-tracker"
 
-export const revalidate = 300
+export const dynamic = "force-dynamic"
 
 function scoreColor(s: number) {
   if (s >= 80) return "text-emerald-400"

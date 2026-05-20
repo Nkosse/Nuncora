@@ -6,7 +6,7 @@ import { Disclaimer } from "@/components/shared/disclaimer"
 import { Button } from "@/components/ui/button"
 
 export const metadata = { title: "Dashboard" }
-export const revalidate = 300 // ververs elke 60 minuten
+export const dynamic = "force-dynamic"
 
 function scoreColor(s: number) {
   if (s >= 80) return "text-emerald-400"

@@ -4,7 +4,7 @@ import { BookMarked, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export const metadata = { title: "Watchlists" }
-export const revalidate = 300
+export const dynamic = "force-dynamic"
 
 function scoreColor(s: number) {
   if (s >= 75) return "text-emerald-400"
