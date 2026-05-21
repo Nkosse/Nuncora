@@ -80,7 +80,7 @@ async function pipeline(triggeredBy: string, skipDiscovery = false, batchSize = 
           allProfiles.map((p) =>
             supabaseAdmin
               .from("companies")
-              .update({ price: p!.price, market_cap: p!.marketCap, last_updated: now })
+              .update({ price: p!.price, market_cap: p!.marketCap, price_change_pct: p!.changesPercentage, last_updated: now })
               .eq("id", p!.symbol.toLowerCase())
           )
         )
