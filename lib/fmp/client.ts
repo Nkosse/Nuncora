@@ -21,8 +21,8 @@ export interface FMPProfile {
   symbol: string
   companyName: string
   price: number
-  changes: number
-  changesPercentage: number
+  change: number
+  changePercentage: number
   marketCap: number
   beta: number
   volume: number

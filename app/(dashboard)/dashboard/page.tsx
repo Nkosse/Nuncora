@@ -236,9 +236,13 @@ export default async function DashboardPage() {
                   </div>
                   <div className="text-right shrink-0 w-16">
                     <p className="text-sm font-semibold tabular-nums text-zinc-200">${company.price?.toFixed(2) ?? "—"}</p>
-                    <p className={`text-xs ${(company.price_change_pct ?? 0) >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-                      {(company.price_change_pct ?? 0) >= 0 ? "+" : ""}{(company.price_change_pct ?? 0).toFixed(1)}%
-                    </p>
+                    {company.price_change_pct != null ? (
+                      <p className={`text-xs ${company.price_change_pct >= 0 ? "text-emerald-500" : "text-red-500"}`}>
+                        {company.price_change_pct >= 0 ? "+" : ""}{company.price_change_pct.toFixed(1)}%
+                      </p>
+                    ) : (
+                      <p className="text-xs text-zinc-700">—</p>
+                    )}
                   </div>
                 </Link>
               ))}
