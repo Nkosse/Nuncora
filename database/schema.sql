@@ -149,6 +149,11 @@ CREATE TABLE IF NOT EXISTS public.ai_analyses (
   price_target_base     NUMERIC(10, 2),
   price_target_bull     NUMERIC(10, 2),
   price_target_bear     NUMERIC(10, 2),
+  -- instap opportunity
+  entry_is_opportunity  BOOLEAN DEFAULT false,
+  entry_strength        TEXT CHECK (entry_strength IN ('strong','moderate','weak')),
+  entry_reason          TEXT,
+  entry_trigger_type    TEXT CHECK (entry_trigger_type IN ('price_dip','catalyst_approaching','undervalued','combined')),
   -- meta
   news_used             INTEGER DEFAULT 0,                -- # nieuwsartikelen meegenomen
   created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -321,7 +326,13 @@ SELECT
   a.score_short_interest,
   a.score_dilution_risk,
   a.score_sector_tailwind,
-  a.score_valuation
+  a.score_valuation,
+  a.score_insider_ownership,
+  a.entry_is_opportunity,
+  a.entry_strength,
+  a.entry_reason,
+  a.entry_trigger_type,
+  a.entry_price
 FROM public.companies c
 LEFT JOIN LATERAL (
   SELECT * FROM public.ai_analyses a2

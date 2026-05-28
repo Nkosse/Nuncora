@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, AlertTriangle, Calendar, Newspaper, Brain, BarChart2, LineChart } from "lucide-react"
+import { ArrowLeft, ExternalLink, TrendingUp, TrendingDown, AlertTriangle, Calendar, Newspaper, Brain, BarChart2, LineChart, Target } from "lucide-react"
 import { supabaseAdmin } from "@/lib/supabase/admin"
 import { Disclaimer } from "@/components/shared/disclaimer"
 import { Button } from "@/components/ui/button"
@@ -227,6 +227,48 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
           </div>
         ))}
       </div>
+
+      {/* Instap Opportunity banner */}
+      {analysis?.entry_is_opportunity && (
+        <div className={cn(
+          "rounded-xl border p-4 flex items-start gap-4",
+          analysis.entry_strength === "strong"
+            ? "border-emerald-500/30 bg-emerald-500/5"
+            : analysis.entry_strength === "moderate"
+            ? "border-amber-500/30 bg-amber-500/5"
+            : "border-zinc-700 bg-zinc-900"
+        )}>
+          <div className="h-9 w-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+            <Target className="h-4 w-4 text-emerald-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <p className="text-sm font-semibold text-zinc-100">Instap Kans geïdentificeerd</p>
+              <span className={cn(
+                "text-[10px] font-semibold rounded border px-1.5 py-0.5",
+                analysis.entry_strength === "strong"
+                  ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                  : analysis.entry_strength === "moderate"
+                  ? "text-amber-400 bg-amber-500/10 border-amber-500/20"
+                  : "text-zinc-400 bg-zinc-800 border-zinc-700"
+              )}>
+                {analysis.entry_strength}
+              </span>
+              {analysis.entry_trigger_type && (
+                <span className="text-[10px] text-zinc-500 bg-zinc-800 rounded px-1.5 py-0.5">
+                  {(({
+                    price_dip: "Koersdaling",
+                    catalyst_approaching: "Catalyst nadert",
+                    undervalued: "Onderwaardering",
+                    combined: "Meerdere signalen",
+                  } as Record<string, string>)[analysis.entry_trigger_type]) ?? analysis.entry_trigger_type}
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-zinc-400">{analysis.entry_reason}</p>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <Tabs defaultValue="overview">

@@ -41,6 +41,12 @@ export interface CompanyAnalysis {
   }
   newsSignal: "positive" | "neutral" | "negative"
   newsHighlight: string
+  entryOpportunity: {
+    isOpportunity: boolean
+    strength: "strong" | "moderate" | "weak"
+    reason: string
+    triggerType: "price_dip" | "catalyst_approaching" | "undervalued" | "combined"
+  }
 }
 
 export async function analyzeCompany(
@@ -152,7 +158,13 @@ Retourneer UITSLUITEND een geldig JSON object (geen markdown, geen uitleg):
     "bear": <12-maands bear scenario prijs>
   },
   "newsSignal": "<positive|neutral|negative>",
-  "newsHighlight": "1 zin over het belangrijkste nieuws-item of 'Geen significant nieuws' als er niets is"
+  "newsHighlight": "1 zin over het belangrijkste nieuws-item of 'Geen significant nieuws' als er niets is",
+  "entryOpportunity": {
+    "isOpportunity": <true als dit een goed instapmoment is, anders false>,
+    "strength": "<strong|moderate|weak>",
+    "reason": "1 concrete zin waarom dit een instapmoment is (of waarom niet). Noem de specifieke trigger: koersdaling, aankomende catalyst, onderwaardering, etc.",
+    "triggerType": "<price_dip|catalyst_approaching|undervalued|combined>"
+  }
 }`
 
   const message = await anthropic.messages.create({

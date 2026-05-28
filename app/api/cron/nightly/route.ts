@@ -262,6 +262,10 @@ async function pipeline(triggeredBy: string, skipDiscovery = false, batchSize = 
           price_target_bull: analysis.priceTargets.bull,
           price_target_bear: analysis.priceTargets.bear,
           news_used: news.length,
+          entry_is_opportunity: analysis.entryOpportunity?.isOpportunity ?? false,
+          entry_strength: analysis.entryOpportunity?.strength ?? null,
+          entry_reason: analysis.entryOpportunity?.reason ?? null,
+          entry_trigger_type: analysis.entryOpportunity?.triggerType ?? null,
         })
 
         // Catalysts bijwerken (verwijder oude AI-catalysts, voeg nieuwe toe)

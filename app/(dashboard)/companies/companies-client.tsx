@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react"
 import Link from "next/link"
-import { Search, ArrowUpDown, ChevronUp, ChevronDown, Filter } from "lucide-react"
+import { Search, ArrowUpDown, ChevronUp, ChevronDown, Filter, Target } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -171,7 +171,12 @@ export function CompaniesClient({ companies }: { companies: any[] }) {
                     ) : <span className="text-zinc-700">—</span>}
                   </td>
                   <td className="px-4 py-3">
-                    <p className="text-zinc-200 font-medium tabular-nums">${c.price?.toFixed(2) ?? "—"}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-zinc-200 font-medium tabular-nums">${c.price?.toFixed(2) ?? "—"}</p>
+                      {c.entry_is_opportunity && (
+                        <Target className="h-3 w-3 text-emerald-400 shrink-0" />
+                      )}
+                    </div>
                     {c.price_change_pct != null && (
                       <p className={cn("text-xs tabular-nums", c.price_change_pct >= 0 ? "text-emerald-400" : "text-red-400")}>
                         {c.price_change_pct >= 0 ? "+" : ""}{c.price_change_pct.toFixed(1)}%

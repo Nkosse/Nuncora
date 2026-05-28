@@ -1,9 +1,10 @@
 import Link from "next/link"
-import { TrendingUp, TrendingDown, AlertTriangle, Calendar, ArrowRight, Zap, Building2, Star, RefreshCw } from "lucide-react"
+import { TrendingUp, TrendingDown, AlertTriangle, Calendar, ArrowRight, Zap, Building2, Star, RefreshCw, Target } from "lucide-react"
 import { supabaseAdmin } from "@/lib/supabase/admin"
 import { SectorBadge } from "@/components/shared/sector-badge"
 import { Disclaimer } from "@/components/shared/disclaimer"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 
 export const metadata = { title: "Dashboard" }
 export const dynamic = "force-dynamic"
@@ -106,6 +107,13 @@ export default async function DashboardPage() {
   }
 
   const topOpportunities = companies.slice(0, 6)
+  const entryOpportunities = companies
+    .filter((c) => c.entry_is_opportunity)
+    .sort((a, b) => {
+      const strengthOrder: Record<string, number> = { strong: 0, moderate: 1, weak: 2 }
+      return (strengthOrder[a.entry_strength ?? "weak"] ?? 2) - (strengthOrder[b.entry_strength ?? "weak"] ?? 2)
+    })
+    .slice(0, 4)
   const avgScore = companies.length > 0
     ? Math.round(companies.reduce((s, c) => s + (c.score_total ?? 0), 0) / companies.length)
     : 0
@@ -309,6 +317,63 @@ export default async function DashboardPage() {
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Instap Kansen */}
+      {entryOpportunities.length > 0 && (
+        <div className="rounded-xl border border-emerald-500/20 bg-zinc-900">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+            <div className="flex items-center gap-2">
+              <Target className="h-4 w-4 text-emerald-400" />
+              <h3 className="font-semibold text-zinc-100">Instap Kansen</h3>
+              <span className="text-xs text-zinc-600">— AI-geïdentificeerde ingangspunten</span>
+            </div>
+            <Link href="/companies" className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+              Alle bedrijven <ArrowRight className="h-3 w-3" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-zinc-800/50">
+            {entryOpportunities.map((c) => {
+              const strengthColor = c.entry_strength === "strong"
+                ? "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                : c.entry_strength === "moderate"
+                ? "text-amber-400 bg-amber-500/10 border-amber-500/20"
+                : "text-zinc-400 bg-zinc-800 border-zinc-700"
+              const triggerLabel: Record<string, string> = {
+                price_dip: "Koersdaling",
+                catalyst_approaching: "Catalyst nadert",
+                undervalued: "Onderwaardering",
+                combined: "Meerdere signalen",
+              }
+              return (
+                <Link key={c.id} href={`/companies/${c.slug}`}
+                  className="flex items-start gap-4 px-5 py-4 hover:bg-zinc-800/40 transition-colors group">
+                  <div className="h-10 w-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                    <span className="text-xs font-bold text-emerald-400">{c.ticker?.slice(0, 2)}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-semibold text-zinc-100 group-hover:text-white">{c.name}</span>
+                      <span className="text-xs font-mono text-zinc-600">{c.ticker}</span>
+                    </div>
+                    <p className="text-xs text-zinc-400 leading-relaxed mb-2">{c.entry_reason}</p>
+                    <div className="flex items-center gap-2">
+                      <span className={cn("text-[10px] font-semibold rounded border px-1.5 py-0.5", strengthColor)}>
+                        {c.entry_strength}
+                      </span>
+                      {c.entry_trigger_type && (
+                        <span className="text-[10px] text-zinc-600 bg-zinc-800 rounded px-1.5 py-0.5">
+                          {triggerLabel[c.entry_trigger_type] ?? c.entry_trigger_type}
+                        </span>
+                      )}
+                      <span className="ml-auto text-xs text-zinc-500 tabular-nums">${c.price?.toFixed(2) ?? "—"}</span>
+                    </div>
+                  </div>
+                </Link>
+              )
+            })}
           </div>
         </div>
       )}
