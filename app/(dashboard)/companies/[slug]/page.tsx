@@ -51,6 +51,7 @@ const SUB_SCORE_LABELS: Record<string, string> = {
   score_sector_tailwind:    "Sector Tailwind",
   score_valuation:          "Valuation Discount",
   score_insider_ownership:  "Insider Ownership & Activiteit",
+  score_tech_moat:          "Technologische Verdedigbaarheid",
 }
 
 const SUB_SCORE_INFO: Record<string, { desc: string; high: string; mid: string; low: string }> = {
@@ -119,6 +120,12 @@ const SUB_SCORE_INFO: Record<string, { desc: string; high: string; mid: string; 
     high: "Insiders kopen actief bij eigen aandelen — sterk signaal van intern vertrouwen.",
     mid:  "Stabiel insider ownership — geen alarmsignalen, maar ook geen actieve aankopen.",
     low:  "Zware insider verkopen gedetecteerd — bearish signaal vanuit het management zelf.",
+  },
+  score_tech_moat: {
+    desc: "Hoe wetenschappelijk en technisch moeilijk het product na te maken is door concurrenten. Referentie: ASML EUV = 10, generieke SaaS = 2.",
+    high: "Uitzonderlijk hoge technologische barrière — het product vereist jaren R&D, unieke expertise of geheime processen die vrijwel niet te repliceren zijn.",
+    mid:  "Betekenisvolle technische complexiteit — concurrenten kunnen het bouwen maar hebben een flinke achterstand in tijd en kapitaal.",
+    low:  "Relatief eenvoudig na te maken — de technologie is beschikbaar en de concurrentiemacht is beperkt.",
   },
 }
 

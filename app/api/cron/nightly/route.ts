@@ -251,6 +251,7 @@ async function pipeline(triggeredBy: string, skipDiscovery = false, batchSize = 
           score_sector_tailwind: analysis.asymmetricScore.sectorTailwind,
           score_valuation: analysis.asymmetricScore.valuationDiscount,
           score_insider_ownership: analysis.asymmetricScore.insiderOwnership,
+          score_tech_moat: analysis.asymmetricScore.techMoat,
           risk_level: analysis.riskLevel,
           summary: analysis.summary,
           thesis: analysis.thesis,

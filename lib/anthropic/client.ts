@@ -21,6 +21,7 @@ export interface CompanyAnalysis {
     sectorTailwind: number
     valuationDiscount: number
     insiderOwnership: number
+    techMoat: number
   }
   riskLevel: "low" | "medium" | "high" | "very-high"
   bullCase: string
@@ -118,6 +119,7 @@ Let speciaal op:
 - dilutionRisk: verhoog als schuld hoog of cash runway kort
 - valuationDiscount: gebruik P/S ratio t.o.v. sectorgenoten
 - insiderOwnership: actief inkopen = 8-10, stabiel/geen activiteit = 5-7, zware verkopen = 2-4; gebruik ook trainingskennis over het totale ownership %
+- techMoat: beoordeel hoe wetenschappelijk/technisch moeilijk het product na te maken is. Referentiekader: ASML EUV-lithografie = 10, kwantumcomputers/geavanceerde halfgeleiders = 8-9, eigenwijze biotech-platforms = 7-8, unieke satelliet/rakettech = 7-8, gespecialiseerde AI-hardware = 6-7, generieke SaaS = 2-3, commodityproducten = 1-2
 
 Geef een grondige, genuanceerde analyse. Wees specifiek — noem producten, contracten, klanten, concurrenten bij naam. Vermijd generieke uitspraken.
 
@@ -136,7 +138,8 @@ Retourneer UITSLUITEND een geldig JSON object (geen markdown, geen uitleg):
     "dilutionRisk": <0-10, laag dilutierisico = hogere score>,
     "sectorTailwind": <0-10>,
     "valuationDiscount": <0-10>,
-    "insiderOwnership": <0-10, actief inkopen/hoog % = hogere score>
+    "insiderOwnership": <0-10, actief inkopen/hoog % = hogere score>,
+    "techMoat": <0-10, hoe wetenschappelijk/technisch moeilijk is het product na te maken? ASML = 10, generieke software = 2. Weeg: patenten, specialistische kennis, productiescomplexiteit, R&D-jaren vereist, uniek materiaalgebruik, geheime processen>
   },
   "riskLevel": "<low|medium|high|very-high>",
   "bullCase": "2-3 zinnen bull scenario met specifieke drivers",

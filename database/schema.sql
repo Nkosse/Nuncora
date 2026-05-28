@@ -137,6 +137,7 @@ CREATE TABLE IF NOT EXISTS public.ai_analyses (
   score_dilution_risk   INTEGER,
   score_sector_tailwind INTEGER,
   score_valuation       INTEGER,
+  score_tech_moat       INTEGER,                           -- 0–10: hoe moeilijk is de tech na te maken?
   -- analyse tekst
   risk_level            TEXT CHECK (risk_level IN ('low','medium','high','very-high')),
   summary               TEXT,
@@ -328,6 +329,7 @@ SELECT
   a.score_sector_tailwind,
   a.score_valuation,
   a.score_insider_ownership,
+  a.score_tech_moat,
   a.entry_is_opportunity,
   a.entry_strength,
   a.entry_reason,
