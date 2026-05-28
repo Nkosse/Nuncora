@@ -85,9 +85,8 @@ async function pipeline(triggeredBy: string, skipDiscovery = false, batchSize = 
           )
         )
         const updateErrors = updateResults
-          .filter((r): r is PromiseFulfilledResult<{ error: { message: string } | null }> =>
-            r.status === "fulfilled" && r.value.error !== null)
-          .map((r) => r.value.error!.message)
+          .filter((r) => r.status === "fulfilled" && r.value.error !== null)
+          .map((r) => (r as PromiseFulfilledResult<{ error: { message: string } }>).value.error.message)
         if (updateErrors.length > 0) {
           errors.push(`Prijsupdate fouten: ${updateErrors.slice(0, 3).join(", ")}`)
         }
