@@ -263,6 +263,7 @@ async function pipeline(triggeredBy: string, skipDiscovery = false, batchSize = 
           price_target_bull: analysis.priceTargets.bull,
           price_target_bear: analysis.priceTargets.bear,
           news_used: news.length,
+          plain_summary: analysis.plainSummary ?? null,
           entry_is_opportunity: analysis.entryOpportunity?.isOpportunity ?? false,
           entry_strength: analysis.entryOpportunity?.strength ?? null,
           entry_reason: analysis.entryOpportunity?.reason ?? null,

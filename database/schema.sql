@@ -150,6 +150,8 @@ CREATE TABLE IF NOT EXISTS public.ai_analyses (
   price_target_base     NUMERIC(10, 2),
   price_target_bull     NUMERIC(10, 2),
   price_target_bear     NUMERIC(10, 2),
+  -- begrijpelijke uitleg
+  plain_summary         JSONB,                             -- { whatTheyDo, competitors[], whyItCouldWork }
   -- instap opportunity
   entry_is_opportunity  BOOLEAN DEFAULT false,
   entry_strength        TEXT CHECK (entry_strength IN ('strong','moderate','weak')),

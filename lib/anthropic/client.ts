@@ -42,6 +42,11 @@ export interface CompanyAnalysis {
   }
   newsSignal: "positive" | "neutral" | "negative"
   newsHighlight: string
+  plainSummary: {
+    whatTheyDo: string
+    competitors: string[]
+    whyItCouldWork: string
+  }
   entryOpportunity: {
     isOpportunity: boolean
     strength: "strong" | "moderate" | "weak"
@@ -162,6 +167,11 @@ Retourneer UITSLUITEND een geldig JSON object (geen markdown, geen uitleg):
   },
   "newsSignal": "<positive|neutral|negative>",
   "newsHighlight": "1 zin over het belangrijkste nieuws-item of 'Geen significant nieuws' als er niets is",
+  "plainSummary": {
+    "whatTheyDo": "2-3 zinnen in gewone taal — alsof je het uitlegt aan iemand zonder financiële of technische achtergrond. Geen jargon. Beschrijf wat het bedrijf maakt of doet, voor wie, en wat het concreet oplost.",
+    "competitors": ["Concurrent 1 — één zin wat hen anders maakt", "Concurrent 2 — één zin", "Concurrent 3 — één zin"],
+    "whyItCouldWork": "2-3 zinnen in begrijpelijke taal waarom dit bedrijf een grote kans heeft. Focus op de concrete reden: uniek product, groeiende vraag, sterke positie. Vermijd beursjargon."
+  },
   "entryOpportunity": {
     "isOpportunity": <true als dit een goed instapmoment is, anders false>,
     "strength": "<strong|moderate|weak>",

@@ -301,6 +301,33 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             </div>
           ) : (
             <>
+            {/* Begrijpelijke uitleg */}
+            {analysis.plain_summary && (
+              <div className="rounded-xl border border-zinc-700 bg-zinc-900 p-5 space-y-5">
+                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">In gewone taal</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div>
+                    <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-2">Wat doen ze?</p>
+                    <p className="text-sm text-zinc-300 leading-relaxed">{analysis.plain_summary.whatTheyDo}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-2">Concurrenten</p>
+                    <ul className="space-y-1.5">
+                      {(analysis.plain_summary.competitors ?? []).map((c: string, i: number) => (
+                        <li key={i} className="text-sm text-zinc-400 leading-snug flex items-start gap-1.5">
+                          <span className="text-zinc-600 shrink-0 mt-0.5">·</span>{c}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-2">Waarom kan het werken?</p>
+                    <p className="text-sm text-zinc-300 leading-relaxed">{analysis.plain_summary.whyItCouldWork}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               <div className="lg:col-span-2 space-y-5">
                 {/* Samenvatting */}
