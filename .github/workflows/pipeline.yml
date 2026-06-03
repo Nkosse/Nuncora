@@ -1,0 +1,44 @@
+name: Analysis Pipeline
+
+on:
+  schedule:
+    # 4x per dag: 01:00, 07:00, 13:00, 19:00 UTC = 12 analyses/dag
+    - cron: '0 1,7,13,19 * * *'
+  workflow_dispatch:
+    inputs:
+      batchSize:
+        description: 'Aantal bedrijven om te analyseren (0 = alleen prijsupdate)'
+        default: '3'
+        required: false
+      skipDiscovery:
+        description: 'Discovery overslaan?'
+        default: 'true'
+        required: false
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Run Nuncora pipeline
+        run: |
+          BATCH_SIZE="${{ github.event.inputs.batchSize || '3' }}"
+          SKIP_DISCOVERY="${{ github.event.inputs.skipDiscovery || 'true' }}"
+
+          response=$(curl -s -w "\n%{http_code}" \
+            -X POST "${{ secrets.NUNCORA_APP_URL }}/api/cron/nightly" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"skipDiscovery\": ${SKIP_DISCOVERY}, \"batchSize\": ${BATCH_SIZE}}" \
+            --max-time 540)
+
+          http_code=$(echo "$response" | tail -1)
+          body=$(echo "$response" | sed '$d')
+
+          echo "HTTP status: $http_code"
+          echo "$body" | python3 -m json.tool 2>/dev/null || echo "$body"
+
+          if [ "$http_code" != "200" ]; then
+            echo "Pipeline mislukt (HTTP $http_code)"
+            exit 1
+          fi
